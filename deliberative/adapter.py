@@ -15,11 +15,11 @@
 from geometry_msgs.msg import PoseStamped, TransformStamped
 import numpy as np
 import rospy
-from tf import TransfromerROS, transformations 
+import tf
 
 
 #TODO: PASS THESE IN AS ARGUMENTS
-REF_FRAME = "base_footprint"
+REF_FRAME = "base_link"
 
 
 class RobotTrajectoryAdapter(object):
@@ -35,38 +35,50 @@ class RobotTrajectoryAdapter(object):
         
         # Initialize rospy node
         rospy.init_node("dual_arm_trajectory_adapter", anonymous=True)
+        rospy.loginfo("Adapter node initialized...")
         
-        # Run script
-        self.main()
+        # Initialize cleanup for this node
+        rospy.on_shutdown(self.cleanup)
         
-    def compute_eef_offset(self, eef_frames):
+        # Create a transform listener
+        self.listener = tf.TransformListener()
+        
+        # Wait for things to setup properly
+        rospy.sleep(1.0)
+        
+    def compute_eef_offset(self, frame_1, frame_2):
         """
-        Compute the offset between the two end-effectors rquired to maintain
-        relative orientation, in the first arm's frame.
+        Compute the offset (transfromation matrix) between the from frame_1
+        to frame_2.
         
-        eef_frames: The two end effector frame names, 'lead'-frame first
-        
+        Adapted from:
         https://answers.ros.org/question/229329/what-is-the-right-way-to-inverse-a-transform-in-python/
         """
         
-        # Create a 'TransfromerROS' object for frame transfromation use
-        transformer = tf.TransformerROS()
-        
+        frames = [frame_1, frame_2]
         tf_frames = []
         
-        # Convert the two given poses into 'frames' (transformation matrix from origin)
-        for frame in eef_frames:
-            (trans, rot) = transformer.lookupTransform(frame, REF_FRAME, rospy.Time(0))
-            trans_matrix = transformations.translation_matrix(trans)
-            rot_matrix = transformations.quaternion_matrix(rot)
-            tf_frames.append(transformations.concatenate_matrices(trans_matrix, rot_matrix))
+        # Get the transformation matrix of each frame from the fixed reference frame
+        for frame in frames:
             
-        # Invert the lead-frame matrix
-        lead_matrix_inverse = transformations.inverse_matrix(tf_frames(0))
+            # Try to get the info on the frames from tf
+            try:
+                (trans, rot) = self.listener.lookupTransform(frame, REF_FRAME, rospy.Time(0))
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                rospy.loginfo("Error: Failed to recieve the transform for {} to {}".format(REF_FRAME, frame))
+                exit() # <--Give it multiple tries instead?
+
+            # Determine the transfromation matrix
+            trans_matrix = tf.transformations.translation_matrix(trans)
+            rot_matrix = tf.transformations.quaternion_matrix(rot)
+            tf_frames.append(tf.transformations.concatenate_matrices(trans_matrix, rot_matrix))
+            
+        # Invert the  first frame matrix
+        matrix_1_inverse = tf.transformations.inverse_matrix(tf_frames[0])
 
         # Get the static transformation matrix from lead to follow frame
-        offset = np.dot(lead_matrix_inverse, tf_frame(1))
-        
+        offset = np.dot(matrix_1_inverse, tf_frames[1])
+        print offset
         return offset
         
     def pose_to_frame_matrix(self, pose_stamped):
@@ -77,12 +89,12 @@ class RobotTrajectoryAdapter(object):
         
         # Get translation and quaternion rotation out of pose
         trans = pose_stamped.pose.position
-        rot = pose_stamped.pose.quaternion
+        rot = pose_stamped.pose.orientation
         
         # Convert to 'frame' (transformation matrix from origin)
-        trans_matrix = transformations.translation_matrix(trans)
-        rot_matrix = transformations.quaternion_matrix(rot)
-        frame_matrix = transformations.concatenate_matrices(trans_matrix, rot_matrix)
+        trans_matrix = tf.transformations.translation_matrix(trans)
+        rot_matrix = tf.transformations.quaternion_matrix(rot)
+        frame_matrix = tf.transformations.concatenate_matrices(trans_matrix, rot_matrix)
         
         return frame_matrix
         
@@ -100,7 +112,7 @@ class RobotTrajectoryAdapter(object):
         #   TODO: test this stuff first, to make sure its working
         print(frame_matrix)
         rot_matrix = frame_matrix[0:3,0:3]
-        rot = transformations.quaternion_from_matrix(rot_matrix)
+        rot = tf.transformations.quaternion_from_matrix(rot_matrix)
         
         return trans, rot
         
@@ -127,13 +139,13 @@ class RobotTrajectoryAdapter(object):
             waypoint = PoseStamped()
             waypoint.header.frame_id = REF_FRAME
             waypoint.header.stamp = time_stamp(i)
-            waypoint.header.position = trans
-            waypoint.header.quaternion = rot
+            waypoint.pose.position = trans
+            waypoint.pose.orientation = rot
             
             # Place into follow pose array
-            follow_eef_poses(i) = waypoint
+            follow_eef_poses[i] = waypoint
             
-        return waypoint
+        return follow_eef_poses
             
     
     def check_trajectories(self, parsed_trajectory, follow_trajectory):
@@ -141,4 +153,13 @@ class RobotTrajectoryAdapter(object):
         Check to make sure the trajectories are safe and executable
         """
         pass
+        
+    def cleanup(self):
+        """
+        Things to do when shutdown occurs.
+        """
+        
+        # Log shutdown
+        rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter'")
+        rospy.sleep(1)
         
