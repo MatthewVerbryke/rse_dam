@@ -67,7 +67,7 @@ class RobotTrajectoryAdapter(object):
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 rospy.loginfo("Error: Failed to recieve the transform for {} to {}".format(REF_FRAME, frame))
                 exit() # <--Give it multiple tries instead?
-
+            
             # Determine the transfromation matrix
             trans_matrix = tf.transformations.translation_matrix(trans)
             rot_matrix = tf.transformations.quaternion_matrix(rot)
@@ -75,10 +75,10 @@ class RobotTrajectoryAdapter(object):
             
         # Invert the  first frame matrix
         matrix_1_inverse = tf.transformations.inverse_matrix(tf_frames[0])
-
+        
         # Get the static transformation matrix from lead to follow frame
         offset = np.dot(matrix_1_inverse, tf_frames[1])
-        print offset
+        
         return offset
         
     def pose_to_frame_matrix(self, pose_stamped):

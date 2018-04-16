@@ -25,8 +25,8 @@ import rospy
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
 GRIPPER_GROUP = "widowx_gripper"
-REF_FRAME = "base_footprint"
-LAUNCH_RVIZ = True
+REF_FRAME = "world"
+LAUNCH_RVIZ = False
 
 
 class RSEMoveItInterface(object):
@@ -77,8 +77,9 @@ class RSEMoveItInterface(object):
         self.arm.allow_replanning(True)
         
         # Add tolerence to goal position and orientation
-        self.arm.set_goal_position_tolerance(0.01)
-        self.arm.set_goal_orientation_tolerance(0.05)
+        self.arm.set_goal_position_tolerance(0.1)
+        self.arm.set_goal_orientation_tolerance(0.1)
+        rospy.loginfo("MoveIt! interface initialized...")
         
         # Set up a subscriber to listen for goal pose commands
         #rospy.Subscriber("{}_pose_command".format(planning_group), PoseStamped, self.get_target_pose)
@@ -86,10 +87,12 @@ class RSEMoveItInterface(object):
         # Setup a connection to the 'compute_ik' service
         self.ik_srv = rospy.ServiceProxy("/compute_ik", GetPositionIK)
         self.ik_srv.wait_for_service()
+        rospy.loginfo("IK service initialized...")
         
         # Setup a connection to the 'compute_fk' service
         self.fk_srv = rospy.ServiceProxy("/compute_fk", GetPositionFK)
         self.fk_srv.wait_for_service()
+        rospy.loginfo("FK service initialized...")
         
     def plan_to_pose_goal(self, pose):
         """
@@ -102,16 +105,16 @@ class RSEMoveItInterface(object):
         
         # Set the start state to the current state
         self.arm.set_start_state_to_current_state()
-        
+
         # Set the goal pose to the target pose
         self.arm.set_pose_target(target_pose, self.eef_link)
-        
+
         # Plan the trajectory
         trajectory_plan = self.arm.plan()
-        
+
         return trajectory_plan
         
-    def plan_to_joint_angle_goal(self, joint_angles)
+    def plan_to_joint_angle_goal(self, joint_angles):
         """
         Create a trajectory plan for the group from the current pose to 
         the goal joint angle target.
@@ -255,8 +258,8 @@ class RSEMoveItInterface(object):
         
         # Build the service request
         req = GetPositionFKRequest()
-        req.fk_request.frame_id = self.ref_frame
-        req.fk_request.fk_link_names = link_names
+        req.header.frame_id = self.ref_frame
+        req.fk_link_names = [link_names]
         req.robot_state.joint_state = joint_angles
         
         # Try to send the request to the 'compute_fk' service
@@ -279,7 +282,8 @@ class RSEMoveItInterface(object):
         req = GetPositionIKRequest()
         req.ik_request.group_name = self.planning_group
         req.ik_request.pose_stamped = pose
-        req.ik_request.timeout = 1.0
+        req.ik_request.timeout.secs = 1.0
+        req.ik_request.timeout.nsecs = 0.0
         req.ik_request.attempts = 0
         req.ik_request.avoid_collisions = True
         
