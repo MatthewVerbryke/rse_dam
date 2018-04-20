@@ -154,6 +154,8 @@ class RSEMoveItInterface(object):
         """
         For a trajectory produced by MoveIt, determine what the end-effector
         pose is at each time step.
+        
+        TODO: REWORK AND TEST THIS FUNCTION
         """
         
         # Loop setup
@@ -180,6 +182,8 @@ class RSEMoveItInterface(object):
         """
         Given a list of time-stamped poses for the group, construct a 
         'RobotTrajectory'.
+        
+        TODO: REWORK AND TEST THIS FUNCTION
         """
         # Initialize trajectory
         trajectory = moveit_msgs.msg.RobotTrajectory()

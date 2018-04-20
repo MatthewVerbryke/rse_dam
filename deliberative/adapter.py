@@ -11,8 +11,9 @@
   TODO: improve documentation across the board
 """
 
+import copy
 
-from geometry_msgs.msg import PoseStamped, TransformStamped
+from geometry_msgs.msg import Pose, PoseStamped, TransformStamped
 import numpy as np
 import rospy
 import tf
@@ -20,6 +21,9 @@ import tf
 
 #TODO: PASS THESE IN AS ARGUMENTS
 REF_FRAME = "base_link"
+LEFT_EEF_FRAME = "left_wrist_2_link"
+RIGHT_EEF_FRAME = "right_wrist_2_link"
+OBJECT_FRAME = 1 #TODO
 
 
 class RobotTrajectoryAdapter(object):
@@ -39,6 +43,11 @@ class RobotTrajectoryAdapter(object):
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
+        
+        # Get relevent frame names
+        self.ref_frame = REF_FRAME
+        self.left_eef_frame = LEFT_EEF_FRAME
+        self.right_eef_frame = RIGHT_EEF_FRAME
         
         # Create a transform listener
         self.listener = tf.TransformListener()
@@ -83,8 +92,9 @@ class RobotTrajectoryAdapter(object):
         
     def pose_to_frame_matrix(self, pose_stamped):
         """
-        Convert a pose into a transformation matrix from the main frame of
-        reference.
+        Convert a pose into a transformation matrix
+        
+        TODO: TEST THIS FUNCTION
         """
         
         # Get translation and quaternion rotation out of pose
@@ -94,14 +104,15 @@ class RobotTrajectoryAdapter(object):
         # Convert to 'frame' (transformation matrix from origin)
         trans_matrix = tf.transformations.translation_matrix(trans)
         rot_matrix = tf.transformations.quaternion_matrix(rot)
-        frame_matrix = tf.transformations.concatenate_matrices(trans_matrix, rot_matrix)
+        transformation_matrix = tf.transformations.concatenate_matrices(trans_matrix, rot_matrix)
         
-        return frame_matrix
+        return transformation_matrix
         
     def frame_matrix_to_pose(self, frame_matrix):
         """
-        Convert a transfromation matrix from the main frame of reference
-        into a pose.
+        Convert a transfromation matrix into a pose.
+        
+        TODO: TEST THIS FUNCTION
         """
         
         # Get translation of frame
@@ -114,43 +125,69 @@ class RobotTrajectoryAdapter(object):
         rot_matrix = frame_matrix[0:3,0:3]
         rot = tf.transformations.quaternion_from_matrix(rot_matrix)
         
-        return trans, rot
+        # Create pose from results
+        pose_out = Pose()
+        pose_out.positon = trans
+        pose_out.orientation = rot
         
-    def adapt_follow_poses(self, time_stamps, lead_eef_poses, offset):
+        return pose_out
+        
+    def adapt_arm_poses(self, time_stamps, object_poses)
         """
-        Create an array of poses for the 'follow' arm that are at the required
-        fixed offset from the 'lead arm at each time_step.
+        Create an array of poses for each of the arms based on the object
+        pose array, each using their respective offset. 
+        
+        TODO: TEST THIS FUNCTION
         """
         
-        # Loop setup
-        waypoint_tot = len(lead_eff_poses)
-        follow_eef_poses = [None]*waypoint_tot
+        # Setup resultant PoseArray's
+        left_poses = PoseArray()
+        left_poses.header = object_poses.header
+        right_poses = PoseArray()
+        right_poses.header = object_poses.header
         
-        # Build array of 'PoseStamped' waypoints
-        for i in range(0,waypoint_tot):
+        # Get the offsets for the left and right eef's
+        left_offset = self.compute_eef_offset(object_frame, left_eef_frame)
+        right_offset = self.compute_eef_offset(object_frame, right_eef_frame)
+        
+        # Setup loop
+        traj_wp_num = len(object_poses.poses)
+        left_pose_list = [None]*traj_wp_num
+        right_pose_list = [None]*traj_wp_num
+        
+        # Determine eef poses for each object pose
+        for i in range(0,traj_wp_num):
             
-            # Determine and decompose follow frame matrix
-            lead_frame_matrix = self.pose_to_frame_matrix(lead_eef_poses(i))
-            follow_frame_matrix = np.dot(lead_frame_matrix, offset);
-            trans, rot = frame_matrix_to_pose(follow_frame_matrix)
-            print (trans, rot)
+            # Get object transform matrix at the time step
+            object_matrix = self.pose_to_frame_matrix(object_poses[i])
+                        
+            # Determine the left eef pose at the time step
+            left_eef_matrix = np.dot(object_matrix, left_offset)
+            left_pose = frame_matrix_to_pose(left_eef_matrix)
             
-            # Construct 'PoseStamped'
-            waypoint = PoseStamped()
-            waypoint.header.frame_id = REF_FRAME
-            waypoint.header.stamp = time_stamp(i)
-            waypoint.pose.position = trans
-            waypoint.pose.orientation = rot
+            # Determine the right eef pose at the time step
+            right_eef_matrix = np.dot(object_matrix, right_offset)
+            right_pose = frame_matrix_to_pose(right_eef_matrix)
             
-            # Place into follow pose array
-            follow_eef_poses[i] = waypoint
+            # Store results
+            left_pose_list[i] = left_pose
+            right_pose_list[i] = right_pose
             
-        return follow_eef_poses
-            
+        # Store final arrays in PoseArray's
+        left_poses.poses = left_pose_list
+        right_poses.poses = right_pose_list
+        
+        return left_poses, right_poses
+    
+    def get_velocities(self, traj):
+        """
+        TODO
+        """
+        pass
     
     def check_trajectories(self, parsed_trajectory, follow_trajectory):
         """
-        Check to make sure the trajectories are safe and executable
+        TODO
         """
         pass
         
