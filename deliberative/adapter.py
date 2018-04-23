@@ -18,13 +18,16 @@ import numpy as np
 import rospy
 import tf
 
+import trajectories
+
 
 #TODO: PASS THESE IN AS ARGUMENTS
 REF_FRAME = "base_link"
 LEFT_EEF_FRAME = "left_wrist_2_link"
 RIGHT_EEF_FRAME = "right_wrist_2_link"
 OBJECT_FRAME = 1 #TODO
-
+SPEED = 0.05 #m/s
+LIFT_HEIGHT = 0.1
 
 class RobotTrajectoryAdapter(object):
     """
@@ -48,12 +51,28 @@ class RobotTrajectoryAdapter(object):
         self.ref_frame = REF_FRAME
         self.left_eef_frame = LEFT_EEF_FRAME
         self.right_eef_frame = RIGHT_EEF_FRAME
+        self.speed = SPEED
+        self.lift_height = LIFT_HEIGHT
         
         # Create a transform listener
         self.listener = tf.TransformListener()
         
         # Wait for things to setup properly
         rospy.sleep(1.0)
+        
+    def get_object_trajectory(self, template):
+        """
+        Based on the selected trajectory plan (user specified?), get a 
+        trajectory that the target object must follow.
+        """
+        
+        # Create the object trajectory based on the template choice
+        if (template=="simple pick and place"):
+            trajectory = create_simple_move_trajectory(start_pose, goal_pose, self.lift_height, self.speed)
+        else:
+            print "Error: trajectory type not found"
+            
+        return trajectory
         
     def compute_eef_offset(self, frame_1, frame_2):
         """
@@ -90,6 +109,46 @@ class RobotTrajectoryAdapter(object):
         
         return offset
         
+    def adapt_arm_poses(self, time_stamps, object_poses, offset, side):
+        """
+        Create an array of poses for the arm based on the object pose array,
+        using the predetermined offset. 
+        
+        TODO: TEST THIS FUNCTION
+        """
+        
+        # Setup resultant PoseArray
+        poses = PoseArray()
+        poses.header = object_poses.header
+        
+        # Setup loop
+        traj_wp_num = len(object_poses.poses)
+        pose_list = [None]*traj_wp_num
+        
+        # Determine eef pose for each object pose
+        for i in range(0,traj_wp_num):
+            
+            # Get object transform matrix at the time step
+            object_matrix = self.pose_to_frame_matrix(object_poses[i])
+            
+            # Determine the eef pose at the time step
+            eef_matrix = np.dot(object_matrix, offset)
+            pose_i = frame_matrix_to_pose(eef_matrix)
+            
+            # Store results
+            pose_list[i] = pose_i
+            
+        # Store final arrays in PoseArray's
+        poses.poses = pose_list
+        
+        return poses
+    
+    def check_trajectories(self, parsed_trajectory, follow_trajectory):
+        """
+        TODO
+        """
+        pass
+        
     def pose_to_frame_matrix(self, pose_stamped):
         """
         Convert a pose into a transformation matrix
@@ -121,7 +180,6 @@ class RobotTrajectoryAdapter(object):
         # Get quarternion rotation of the frame
         #   Not sure about this, might need to back out only rot part of matrix
         #   TODO: test this stuff first, to make sure its working
-        print(frame_matrix)
         rot_matrix = frame_matrix[0:3,0:3]
         rot = tf.transformations.quaternion_from_matrix(rot_matrix)
         
@@ -130,73 +188,12 @@ class RobotTrajectoryAdapter(object):
         pose_out.positon = trans
         pose_out.orientation = rot
         
-        return pose_out
-        
-    def adapt_arm_poses(self, time_stamps, object_poses)
-        """
-        Create an array of poses for each of the arms based on the object
-        pose array, each using their respective offset. 
-        
-        TODO: TEST THIS FUNCTION
-        """
-        
-        # Setup resultant PoseArray's
-        left_poses = PoseArray()
-        left_poses.header = object_poses.header
-        right_poses = PoseArray()
-        right_poses.header = object_poses.header
-        
-        # Get the offsets for the left and right eef's
-        left_offset = self.compute_eef_offset(object_frame, left_eef_frame)
-        right_offset = self.compute_eef_offset(object_frame, right_eef_frame)
-        
-        # Setup loop
-        traj_wp_num = len(object_poses.poses)
-        left_pose_list = [None]*traj_wp_num
-        right_pose_list = [None]*traj_wp_num
-        
-        # Determine eef poses for each object pose
-        for i in range(0,traj_wp_num):
-            
-            # Get object transform matrix at the time step
-            object_matrix = self.pose_to_frame_matrix(object_poses[i])
-                        
-            # Determine the left eef pose at the time step
-            left_eef_matrix = np.dot(object_matrix, left_offset)
-            left_pose = frame_matrix_to_pose(left_eef_matrix)
-            
-            # Determine the right eef pose at the time step
-            right_eef_matrix = np.dot(object_matrix, right_offset)
-            right_pose = frame_matrix_to_pose(right_eef_matrix)
-            
-            # Store results
-            left_pose_list[i] = left_pose
-            right_pose_list[i] = right_pose
-            
-        # Store final arrays in PoseArray's
-        left_poses.poses = left_pose_list
-        right_poses.poses = right_pose_list
-        
-        return left_poses, right_poses
-    
-    def get_velocities(self, traj):
-        """
-        TODO
-        """
-        pass
-    
-    def check_trajectories(self, parsed_trajectory, follow_trajectory):
-        """
-        TODO
-        """
-        pass
+        return pose_out    
         
     def cleanup(self):
         """
         Things to do when shutdown occurs.
         """
-        
         # Log shutdown
         rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter'")
         rospy.sleep(1)
-        

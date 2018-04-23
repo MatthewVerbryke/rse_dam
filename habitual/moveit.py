@@ -298,7 +298,12 @@ class RSEMoveItInterface(object):
             
         except rospy.ServiceException:
             rospy.logerr("Service execption:" + str(rospy.ServiceException))
-            
+    
+    def get_velocities(self, traj):
+        """
+        TODO
+        """
+        pass
         
     def cleanup(self):
         """
