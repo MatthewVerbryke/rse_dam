@@ -13,7 +13,7 @@
 
 import copy
 
-from geometry_msgs.msg import Pose, PoseStamped, TransformStamped
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped, TransformStamped
 import numpy as np
 import rospy
 import tf
@@ -117,12 +117,10 @@ class RobotTrajectoryAdapter(object):
 
         return offset
         
-    def adapt_arm_poses(self, time_stamps, object_poses, offset, side):
+    def adapt_arm_poses(self, object_poses, offset):
         """
         Create an array of poses for the arm based on the object pose array,
-        using the predetermined offset. 
-        
-        TODO: TEST THIS FUNCTION
+        using the predetermined offset.
         """
         
         # Setup resultant PoseArray
@@ -137,14 +135,22 @@ class RobotTrajectoryAdapter(object):
         for i in range(0,traj_wp_num):
             
             # Get object transform matrix at the time step
-            object_matrix = self.pose_to_frame_matrix(object_poses[i])
+            object_matrix = self.pose_to_frame_matrix(object_poses.poses[i])
             
             # Determine the eef pose at the time step
             eef_matrix = np.dot(object_matrix, offset)
-            pose_i = frame_matrix_to_pose(eef_matrix)
+            pose_i = self.frame_matrix_to_pose(eef_matrix)
+            
+            # Create pose stamped from the pose output
+            pose_stamped_i = PoseStamped()
+            pose_stamped_i.header.seq = copy.deepcopy(object_poses.poses[i].header.seq)
+            pose_stamped_i.header.stamp = copy.deepcopy(object_poses.poses[i].header.stamp)
+            pose_stamped_i.header.frame_id = 1
+            pose_stamped_i.pose.position = pose_i.position
+            pose_stamped_i.pose.orientation = pose_i.orientation
             
             # Store results
-            pose_list[i] = pose_i
+            pose_list[i] = pose_stamped_i
             
         # Store final arrays in PoseArray's
         poses.poses = pose_list
@@ -211,5 +217,5 @@ class RobotTrajectoryAdapter(object):
         Things to do when shutdown occurs.
         """
         # Log shutdown
-        rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter'")
+        rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter")
         rospy.sleep(1)

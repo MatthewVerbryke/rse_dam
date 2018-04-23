@@ -13,7 +13,7 @@
 
 import copy
 
-from geometry_msgs.msg import Pose, PoseArray
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 import math
 import rospy
 
@@ -69,19 +69,27 @@ def create_simple_move_trajectory(start_pose, goal_pose, lift_height, speed):
         
         # Fill out poses
         for j in range(0, list_lens[i]):
-            pose_j = Pose()
-            pose_j.position.x = points[i].position.x + x_step*j
-            pose_j.position.y = points[i].position.y + y_step*j
-            pose_j.position.z = points[i].position.z + z_step*j
-            pose_j.orientation = start_pose.orientation
+            pose_j = PoseStamped()
+            pose_j.header.seq = j
+            pose_j.header.stamp = j*timestep
+            pose_j.header.frame_id = 1
+            pose_j.pose.position.x = points[i].position.x + x_step*j
+            pose_j.pose.position.y = points[i].position.y + y_step*j
+            pose_j.pose.position.z = points[i].position.z + z_step*j
+            pose_j.pose.orientation = start_pose.orientation
             pose_list[j] = pose_j
-            
+
         # Place the goal point at the end as well
-        pose_list[list_lens[i]] = copy.deepcopy(points[i+1])
+        temp_pose = PoseStamped()
+        temp_pose.header.seq = j+1
+        temp_pose.header.stamp = (j+1)*timestep
+        temp_pose.header.frame_id = 1
+        temp_pose.pose = copy.deepcopy(points[i+1])
+        pose_list[list_lens[i]] = temp_pose
         
         # Package result
         trajectory.poses = pose_list
         trajectories[i] = trajectory
-        
+    
     return trajectories
 
