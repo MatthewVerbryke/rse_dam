@@ -76,8 +76,7 @@ class RobotTrajectoryAdapter(object):
         
     def compute_eef_offset(self, frame_1, frame_2):
         """
-        Compute the offset (transfromation matrix) between the from frame_1
-        to frame_2.
+        Compute the offset (transfromation matrix) from frame_1 to frame_2.
         
         Adapted from:
         https://answers.ros.org/question/229329/what-is-the-right-way-to-inverse-a-transform-in-python/
@@ -89,24 +88,33 @@ class RobotTrajectoryAdapter(object):
         # Get the transformation matrix of each frame from the fixed reference frame
         for frame in frames:
             
-            # Try to get the info on the frames from tf
-            try:
-                (trans, rot) = self.listener.lookupTransform(frame, REF_FRAME, rospy.Time(0))
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                rospy.loginfo("Error: Failed to recieve the transform for {} to {}".format(REF_FRAME, frame))
-                exit() # <--Give it multiple tries instead?
-            
-            # Determine the transfromation matrix
-            trans_matrix = tf.transformations.translation_matrix(trans)
-            rot_matrix = tf.transformations.quaternion_matrix(rot)
-            tf_frames.append(tf.transformations.concatenate_matrices(trans_matrix, rot_matrix))
+            # Try to get the info on the frames from tf if given a link name     
+            if (type(frame)==str):
+                try:
+                    (trans, rot) = self.listener.lookupTransform(frame, REF_FRAME, rospy.Time(0))
+                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                    rospy.loginfo("Error: Failed to recieve the transform for {} to {}".format(REF_FRAME, frame))
+                    exit() # <--Give it multiple tries instead?
+                    
+                # Determine the transfromation matrix
+                trans_matrix = tf.transformations.translation_matrix(trans)
+                rot_matrix = tf.transformations.quaternion_matrix(rot)
+                tf_frames.append(tf.transformations.concatenate_matrices(trans_matrix, rot_matrix))
+                    
+            # Use transfromations functions to get the frame info if frame is a pose
+            elif (type(frame)==Pose) or (type(frame)==PoseStamped):
+                tf_frames.append(self.pose_to_frame_matrix(frame))
+                
+            else:
+                rospy.loginfo("Error: frame {} is not an allowed type".format(len(tf_frames)+1))
+                exit()
             
         # Invert the  first frame matrix
         matrix_1_inverse = tf.transformations.inverse_matrix(tf_frames[0])
         
         # Get the static transformation matrix from lead to follow frame
         offset = np.dot(matrix_1_inverse, tf_frames[1])
-        
+
         return offset
         
     def adapt_arm_poses(self, time_stamps, object_poses, offset, side):
@@ -167,8 +175,8 @@ class RobotTrajectoryAdapter(object):
         rot = np.array([pose_rot.x, pose_rot.y, pose_rot.z, pose_rot.w])
         
         # Convert to 'frame' (transformation matrix from origin)
-        trans_matrix = tf.transformations.translation_matrix(trans);
-        rot_matrix = tf.transformations.quaternion_matrix(rot);
+        trans_matrix = tf.transformations.translation_matrix(trans)
+        rot_matrix = tf.transformations.quaternion_matrix(rot)
         transformation_matrix = tf.transformations.concatenate_matrices(trans_matrix, rot_matrix)
         
         return transformation_matrix
