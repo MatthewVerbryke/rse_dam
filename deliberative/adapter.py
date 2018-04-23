@@ -149,20 +149,26 @@ class RobotTrajectoryAdapter(object):
         """
         pass
         
-    def pose_to_frame_matrix(self, pose_stamped):
+    def pose_to_frame_matrix(self, pose_in):
         """
         Convert a pose into a transformation matrix
-        
-        TODO: TEST THIS FUNCTION
         """
         
-        # Get translation and quaternion rotation out of pose
-        trans = pose_stamped.pose.position
-        rot = pose_stamped.pose.orientation
+        # Get translation and quaternion rotation out of the pose
+        if (type(pose_in)==PoseStamped):
+            pose_trans = pose_in.pose.position
+            pose_rot = pose_in.pose.orientation
+        elif (type(pose_in)==Pose):
+            pose_trans = pose_in.position
+            pose_rot = pose_in.orientation
+        
+        # Parse them into numpy arrays
+        trans = np.array([pose_trans.x, pose_trans.y, pose_trans.z])
+        rot = np.array([pose_rot.x, pose_rot.y, pose_rot.z, pose_rot.w])
         
         # Convert to 'frame' (transformation matrix from origin)
-        trans_matrix = tf.transformations.translation_matrix(trans)
-        rot_matrix = tf.transformations.quaternion_matrix(rot)
+        trans_matrix = tf.transformations.translation_matrix(trans);
+        rot_matrix = tf.transformations.quaternion_matrix(rot);
         transformation_matrix = tf.transformations.concatenate_matrices(trans_matrix, rot_matrix)
         
         return transformation_matrix
@@ -171,22 +177,24 @@ class RobotTrajectoryAdapter(object):
         """
         Convert a transfromation matrix into a pose.
         
-        TODO: TEST THIS FUNCTION
+        NOTE: quaternions may not be functioning correctly; needs more tests
         """
         
         # Get translation of frame
-        trans = transformations.translation_from_matrix(frame_matrix)
+        trans = tf.transformations.translation_from_matrix(frame_matrix)
         
         # Get quarternion rotation of the frame
-        #   Not sure about this, might need to back out only rot part of matrix
-        #   TODO: test this stuff first, to make sure its working
-        rot_matrix = frame_matrix[0:3,0:3]
-        rot = tf.transformations.quaternion_from_matrix(rot_matrix)
+        rot = tf.transformations.quaternion_from_matrix(frame_matrix)
         
         # Create pose from results
         pose_out = Pose()
-        pose_out.positon = trans
-        pose_out.orientation = rot
+        pose_out.position.x = trans[0]
+        pose_out.position.y = trans[1]
+        pose_out.position.z = trans[2]
+        pose_out.orientation.x = rot[0]
+        pose_out.orientation.y = rot[1]
+        pose_out.orientation.z = rot[2]
+        pose_out.orientation.w = rot[3]
         
         return pose_out    
         
