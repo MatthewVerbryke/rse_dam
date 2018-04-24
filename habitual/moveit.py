@@ -12,11 +12,12 @@
 """
 
 
+import copy
 import sys
  
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseArray
 import moveit_commander
-import moveit_msgs.msg
+from moveit_msgs.msg import RobotTrajectory
 from moveit_msgs.srv import GetPositionIK, GetPositionIKRequest, GetPositionIKResponse
 from moveit_msgs.srv import GetPositionFK, GetPositionFKRequest, GetPositionFKResponse
 import rospy
@@ -27,6 +28,7 @@ ARM_GROUP = "widowx_arm"
 GRIPPER_GROUP = "widowx_gripper"
 REF_FRAME = "world"
 LAUNCH_RVIZ = False
+JOINT_NAMES = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
 
 
 class RSEMoveItInterface(object):
@@ -46,6 +48,7 @@ class RSEMoveItInterface(object):
         self.planning_group = ARM_GROUP
         gripper_group = GRIPPER_GROUP
         self.ref_frame = REF_FRAME
+        self.joint_names = JOINT_NAMES
         
         # Initialize moveit_commander
         moveit_commander.roscpp_initialize(sys.argv)
@@ -79,7 +82,7 @@ class RSEMoveItInterface(object):
         # Add tolerence to goal position and orientation
         self.arm.set_goal_position_tolerance(0.1)
         self.arm.set_goal_orientation_tolerance(0.1)
-        rospy.loginfo("MoveIt! interface initialized...")
+        rospy.loginfo("MoveIt! interface initialized")
         
         # Set up a subscriber to listen for goal pose commands
         #rospy.Subscriber("{}_pose_command".format(planning_group), PoseStamped, self.get_target_pose)
@@ -87,12 +90,12 @@ class RSEMoveItInterface(object):
         # Setup a connection to the 'compute_ik' service
         self.ik_srv = rospy.ServiceProxy("/compute_ik", GetPositionIK)
         self.ik_srv.wait_for_service()
-        rospy.loginfo("IK service initialized...")
+        rospy.loginfo("IK service initialized")
         
         # Setup a connection to the 'compute_fk' service
         self.fk_srv = rospy.ServiceProxy("/compute_fk", GetPositionFK)
         self.fk_srv.wait_for_service()
-        rospy.loginfo("FK service initialized...")
+        rospy.loginfo("FK service initialized")
         
     def plan_to_pose_goal(self, pose):
         """
@@ -152,16 +155,22 @@ class RSEMoveItInterface(object):
         
     def get_eef_poses_from_trajectory(self, trajectory):
         """
-        For a trajectory produced by MoveIt, determine what the end-effector
-        pose is at each time step.
+        For a RobotTrajectory, determine the end-effector pose at each 
+        time step along the trajectory.
         
-        TODO: REWORK AND TEST THIS FUNCTION
+        TODO: TEST THIS FUNCTION
         """
+        
+        # Create the output array
+        poses_out = PoseArray()
+        poses_out.header.seq = copy.deepcopy(trajectory.joint_trajectory.header.seq)
+        poses_out.header.stamp = rospy.Time.now()
+        poses_out.header.frame_id = 1
         
         # Loop setup
         poses_tot = len(trajectory.joint_trajectory.points)
-        poses_out = [None]*poses_tot
-        joint_names = trajectory.joint_trajectory.joint_names
+        pose_list = [None]*poses_tot
+        joint_names = trajectory.joint_trajectory.joint_names      
         
         # Build array of 'PoseStamped' waypoints
         for i in range(0,poses_tot):
@@ -171,11 +180,14 @@ class RSEMoveItInterface(object):
             time = trajectory.joint_trajectory.points[i].time_from_start
             resp = self.fk_solve(joint_states, joint_names)
             
-            # Put the pose into the outgoing array
-            pose_out = resp.pose_stamped
+            # Put the pose into list
+            pose.header.seq = i
             pose.header.stamp = time
-            poses_out[i] = pose
-            
+            pose_list[i] = resp.pose_stamped
+        
+        # Put generated list into the PoseArray
+        poses_out.poses = pose_list
+        
         return poses_out
         
     def get_trajectory_from_eef_poses(self, points_array):
@@ -183,31 +195,34 @@ class RSEMoveItInterface(object):
         Given a list of time-stamped poses for the group, construct a 
         'RobotTrajectory'.
         
-        TODO: REWORK AND TEST THIS FUNCTION
+        TODO: TEST THIS FUNCTION
         """
+        
         # Initialize trajectory
-        trajectory = moveit_msgs.msg.RobotTrajectory()
-        trajectory.header.stamp = rospy.Time.now()
-        trajectory.header.frame_id = self.ref_frame
-        #trajectory.joint_names = TODO
+        trajectory = RobotTrajectory()
+        trajectory.joint_trajectory.header.seq = copy.deepcopy(points_array.header.seq)
+        trajectory.joint_trajectory.header.stamp = rospy.Time.now()
+        trajectory.joint_trajectory.header.frame_id = 1
+        trajectory.joint_trajectory.joint_names = self.joint_names
         
         # Loop setup
-        poses_tot = len(points_array)
+        poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
         
         # Build an array of 'JointTrajectoryPoint' waypoints
         for i in range(0,poses_tot):
             
             # Get the joint states using IK
-            time = points_array[i].header.stamp
             resp = self.ik_solve(points_array[i])
             
             # Put the joint states into the outgoing array
             trajectory_points[i].positions = resp
-            trajectory_points[i].time_from_start = time
+            trajectory_points[i].time_from_start = points_array.poses[i].header.stamptime
         
         # Put waypoints into the trajectory
-        trajectory.points = trajectory_points
+        trajectory.joint_trajectory.points = trajectory_points
+        
+        #TODO: get velocities
         
         return trajectory
             
@@ -232,7 +247,7 @@ class RSEMoveItInterface(object):
         """
         
         # Execute the generated plan
-        rospy.loginfo("Excuting trajectory ...")
+        rospy.loginfo("Excuting trajectory...")
         self.arm.execute(plan)
                 
         # Wait a second
@@ -272,7 +287,7 @@ class RSEMoveItInterface(object):
             return resp.pose_stamped
             
         except rospy.ServiceException:
-            rospy.logerr("Service execption:" + str(rospy.ServiceException))
+            rospy.logerr("Service execption: " + str(rospy.ServiceException))
         
     def ik_solve(self, pose):
         """ 
@@ -297,7 +312,7 @@ class RSEMoveItInterface(object):
             return resp.joint_state
             
         except rospy.ServiceException:
-            rospy.logerr("Service execption:" + str(rospy.ServiceException))
+            rospy.logerr("Service execption: " + str(rospy.ServiceException))
     
     def get_velocities(self, traj):
         """

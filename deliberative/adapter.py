@@ -42,7 +42,7 @@ class RobotTrajectoryAdapter(object):
         
         # Initialize rospy node
         rospy.init_node("dual_arm_trajectory_adapter", anonymous=True)
-        rospy.loginfo("Adapter node initialized...")
+        rospy.loginfo("Adapter node initialized")
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
@@ -70,7 +70,7 @@ class RobotTrajectoryAdapter(object):
         if (template=="simple pick and place"):
             trajectory = create_simple_move_trajectory(start_pose, goal_pose, self.lift_height, self.speed)
         else:
-            print "Error: trajectory type not found"
+            rospy.logerr("Trajectory type not found")
             
         return trajectory
         
@@ -93,7 +93,8 @@ class RobotTrajectoryAdapter(object):
                 try:
                     (trans, rot) = self.listener.lookupTransform(frame, REF_FRAME, rospy.Time(0))
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    rospy.loginfo("Error: Failed to recieve the transform for {} to {}".format(REF_FRAME, frame))
+                    rospy.logerr("Failed to recieve the transform for {} to {}".format(REF_FRAME, frame))
+                    self.cleanup()
                     exit() # <--Give it multiple tries instead?
                     
                 # Determine the transfromation matrix
@@ -106,7 +107,8 @@ class RobotTrajectoryAdapter(object):
                 tf_frames.append(self.pose_to_frame_matrix(frame))
                 
             else:
-                rospy.loginfo("Error: frame {} is not an allowed type".format(len(tf_frames)+1))
+                rospy.logerr("Frame {} is not an allowed type".format(len(tf_frames)+1))
+                self.cleanup()
                 exit()
             
         # Invert the  first frame matrix
@@ -217,5 +219,5 @@ class RobotTrajectoryAdapter(object):
         Things to do when shutdown occurs.
         """
         # Log shutdown
-        rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter")
+        rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter'")
         rospy.sleep(1)
