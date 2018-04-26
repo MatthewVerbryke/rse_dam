@@ -18,7 +18,62 @@ import math
 import rospy
 
 
-def create_simple_move_trajectory(start_pose, goal_pose, lift_height, speed):
+def create_simple_move_trajectory(start_pose, goal_pose, speed):
+    """
+    
+    """
+    
+    timestep = 0.1
+    
+    # Get distances between the start and end points
+    delta_x = goal_pose.position.x - start_pose.position.x
+    delta_y = goal_pose.position.y - start_pose.position.y
+    delta_z = goal_pose.position.z - start_pose.position.z
+    traverse_len = math.sqrt(delta_x**2 + delta_y**2 + delta_z**2)
+    
+    # Calculate the number of waypoints along the path (round to next-highest int)
+    traverse_time = traverse_len/speed
+    traverse_wp_len = int(math.ceil(traverse_time/timestep))
+    
+    # Fill out array header
+    trajectory = PoseArray()
+    trajectory.header.seq = 0
+    trajectory.header.frame_id = 1
+    
+    # Setup loop   
+    x_step = (goal_pose.position.x - start_pose.position.x)/traverse_wp_len
+    y_step = (goal_pose.position.y - start_pose.position.y)/traverse_wp_len
+    z_step = (goal_pose.position.z - start_pose.position.z)/traverse_wp_len
+    pose_list = [None]*(traverse_wp_len+1)
+    
+    # Fill out poses
+    for i in range(0, traverse_wp_len):
+        pose_i = PoseStamped()
+        pose_i.header.seq = i
+        pose_i.header.stamp = i*timestep
+        pose_i.header.frame_id = 1
+        pose_i.pose.position.x = start_pose.position.x + x_step*i
+        pose_i.pose.position.y = start_pose.position.y + y_step*i
+        pose_i.pose.position.z = start_pose.position.z + z_step*i
+        pose_i.pose.orientation = start_pose.orientation
+        pose_list[i] = pose_i
+        
+    # Place the goal point at the end as well
+    temp_pose = PoseStamped()
+    temp_pose.header.seq = i+1
+    temp_pose.header.stamp = (i+1)*timestep
+    temp_pose.header.frame_id = 1
+    temp_pose.pose = copy.deepcopy(goal_pose)
+
+    pose_list[traverse_wp_len] = temp_pose
+    
+    # Package result
+    trajectory.poses = pose_list
+    
+    return trajectory
+    
+    
+def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed):
     """
     Creates a simple pick and place trajectory composed of three smaller
     sub-trajectories, with no change in the orientation of the target
@@ -26,6 +81,8 @@ def create_simple_move_trajectory(start_pose, goal_pose, lift_height, speed):
     the surface, moving to a point at the same set height above the goal 
     position, and then placing the object at the goal position. Assumes
     no obstacles are on the path for simplicity.
+    
+    TODO: REWORK
     """
     
     timestep = 0.1
