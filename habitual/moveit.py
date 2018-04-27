@@ -21,12 +21,15 @@ from moveit_msgs.msg import RobotTrajectory
 from moveit_msgs.srv import GetPositionIK, GetPositionIKRequest, GetPositionIKResponse
 from moveit_msgs.srv import GetPositionFK, GetPositionFKRequest, GetPositionFKResponse
 import rospy
+from trajectory_msgs.msg import JointTrajectoryPoint
+
+from reachability import is_pose_reachable
 
 
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
 GRIPPER_GROUP = "widowx_gripper"
-REF_FRAME = "world"
+REF_FRAME = "base_link"
 LAUNCH_RVIZ = False
 JOINT_NAMES = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
 
@@ -195,37 +198,51 @@ class RSEMoveItInterface(object):
         Given a list of time-stamped poses for the group, construct a 
         'RobotTrajectory'.
         
-        TODO: TEST THIS FUNCTION
+        TODO: ADD VELOCITY INTEPOLATION
         """
         
         # Initialize trajectory
         trajectory = RobotTrajectory()
         trajectory.joint_trajectory.header.seq = copy.deepcopy(points_array.header.seq)
         trajectory.joint_trajectory.header.stamp = rospy.Time.now()
-        trajectory.joint_trajectory.header.frame_id = 1
+        trajectory.joint_trajectory.header.frame_id = self.ref_frame
         trajectory.joint_trajectory.joint_names = self.joint_names
         
         # Loop setup
         poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
         
-        # Build an array of 'JointTrajectoryPoint' waypoints
+        # Build an array of JointTrajectoryPoint waypoints
         for i in range(0,poses_tot):
+
+            # Check reachability
+            reachable = is_pose_reachable(points_array.poses[i])
             
             # Get the joint states using IK
-            resp = self.ik_solve(points_array[i])
+            resp = self.ik_solve(points_array.poses[i])
+                        
+            # Initialize JointTrajectoryPoint message
+            trajectory_point = JointTrajectoryPoint()
+            joint_positions = [None]*5 
+            
+            # Remove the gripper joints from the message 
+            # TODO: better way to do this?
+            for j in range(0,5):
+                joint_positions[j] = resp.solution.joint_state.position[j]
+        
+            # Format the outputs
+            trajectory_point.positions = joint_positions
+            trajectory_point.time_from_start = points_array.poses[i].header.stamp
             
             # Put the joint states into the outgoing array
-            trajectory_points[i].positions = resp
-            trajectory_points[i].time_from_start = points_array.poses[i].header.stamptime
-        
+            trajectory_points[i] = trajectory_point
+            
         # Put waypoints into the trajectory
         trajectory.joint_trajectory.points = trajectory_points
         
         #TODO: get velocities
         
         return trajectory
-            
         
     def move_gripper(self, gripper_goal):
         """
@@ -300,16 +317,19 @@ class RSEMoveItInterface(object):
         # Build the the service request
         req = GetPositionIKRequest()
         req.ik_request.group_name = self.planning_group
+        req.ik_request.robot_state.joint_state.name = self.joint_names
+        req.ik_request.robot_state.joint_state.position = [0, 0, 0, 0, 0]
+        req.ik_request.avoid_collisions = True        
+        req.ik_request.ik_link_name = self.eef_link
         req.ik_request.pose_stamped = pose
         req.ik_request.timeout.secs = 1.0
         req.ik_request.timeout.nsecs = 0.0
         req.ik_request.attempts = 0
-        req.ik_request.avoid_collisions = True
-        
+
         # Try to send the request to the 'compute_ik' service
         try:
             resp = self.ik_srv.call(req)
-            return resp.joint_state
+            return resp
             
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
@@ -324,14 +344,13 @@ class RSEMoveItInterface(object):
         """
         Things to do when shutdown occurs.
         """
-
+        # Log shutdown
+        rospy.loginfo("Shutting down node '{}_moveit_interface'".format(self.planning_group))
+        
         # Shut down MoveIt cleanly
         moveit_commander.roscpp_shutdown()
         
         # Exit MoveIt
         moveit_commander.os._exit(0)
-        
-        # Log shutdown
-        rospy.loginfo("Shutting down node '{}_moveit_interface'".format(self.planning_group))
         rospy.sleep(1)
 
