@@ -18,9 +18,12 @@ import math
 import rospy
 
 
-def create_simple_move_trajectory(start_pose, goal_pose, speed):
+def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     """
-    
+    Create a simple trajectory in which the target object moves from the
+    start pose to goal pose at the given speed, with no change in the 
+    object's orientation. Assumes no obstacles are on the path for 
+    simplicity.
     """
     
     timestep = 0.1
@@ -50,8 +53,10 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed):
     for i in range(0, traverse_wp_len):
         pose_i = PoseStamped()
         pose_i.header.seq = i
-        pose_i.header.stamp = i*timestep
-        pose_i.header.frame_id = 1
+        sec, nsec = get_stamp(i*timestep)
+        pose_i.header.stamp.secs = sec
+        pose_i.header.stamp.nsecs = nsec
+        pose_i.header.frame_id = ref_frame
         pose_i.pose.position.x = start_pose.position.x + x_step*i
         pose_i.pose.position.y = start_pose.position.y + y_step*i
         pose_i.pose.position.z = start_pose.position.z + z_step*i
@@ -61,19 +66,20 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed):
     # Place the goal point at the end as well
     temp_pose = PoseStamped()
     temp_pose.header.seq = i+1
-    temp_pose.header.stamp = (i+1)*timestep
-    temp_pose.header.frame_id = 1
+    sec, nsec = get_stamp((i+1)*timestep)
+    temp_pose.header.stamp.secs = sec
+    temp_pose.header.stamp.nsecs = nsec
+    temp_pose.header.frame_id = ref_frame
     temp_pose.pose = copy.deepcopy(goal_pose)
-
     pose_list[traverse_wp_len] = temp_pose
-    
+
     # Package result
     trajectory.poses = pose_list
     
     return trajectory
     
     
-def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed):
+def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed, ref_frame):
     """
     Creates a simple pick and place trajectory composed of three smaller
     sub-trajectories, with no change in the orientation of the target
@@ -82,7 +88,7 @@ def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed):
     position, and then placing the object at the goal position. Assumes
     no obstacles are on the path for simplicity.
     
-    TODO: REWORK
+    TODO: REWORK TO USE THE SIMPLER TRAJECTORY FOUND ABOVE
     """
     
     timestep = 0.1
@@ -129,7 +135,7 @@ def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed):
             pose_j = PoseStamped()
             pose_j.header.seq = j
             pose_j.header.stamp = j*timestep
-            pose_j.header.frame_id = 1
+            pose_j.header.frame_id = ref_frame
             pose_j.pose.position.x = points[i].position.x + x_step*j
             pose_j.pose.position.y = points[i].position.y + y_step*j
             pose_j.pose.position.z = points[i].position.z + z_step*j
@@ -139,8 +145,8 @@ def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed):
         # Place the goal point at the end as well
         temp_pose = PoseStamped()
         temp_pose.header.seq = j+1
-        temp_pose.header.stamp = (j+1)*timestep
-        temp_pose.header.frame_id = 1
+        temp_pose.header.stamp = rospy.Time.from_seconds((j+1)*timestep)
+        temp_pose.header.frame_id = ref_frame
         temp_pose.pose = copy.deepcopy(points[i+1])
         pose_list[list_lens[i]] = temp_pose
         
@@ -149,4 +155,17 @@ def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed):
         trajectories[i] = trajectory
     
     return trajectories
+    
+def get_stamp(float_time):
+    """
+    Convert a floating-point representation of time in seconds into a 
+    ros_msgs 'stamp' style representation (seconds, nanoseconds).
+    """
 
+    # Convert to time in seconds (float) to time in nanoseconds (int)
+    nsec = rospy.Time.from_sec(float_time)
+
+    # Get the number of 'whole' seconds
+    sec = int(float_time)
+    
+    return sec, nsec.nsecs
