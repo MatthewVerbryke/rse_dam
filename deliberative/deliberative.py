@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  TODO: module description
+  Central deliberative layer module. 
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:

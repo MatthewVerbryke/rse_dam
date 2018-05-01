@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  TODO: module description
+  Functions to create template based MoveIt! trajectories.
   
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -159,7 +159,7 @@ def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed, 
 def get_stamp(float_time):
     """
     Convert a floating-point representation of time in seconds into a 
-    ros_msgs 'stamp' style representation (seconds, nanoseconds).
+    ros_msgs 'stamp' style representation.
     """
 
     # Convert to time in seconds (float) to time in nanoseconds (int)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  TODO: module description
+  Trajectory adaptation submodule for dual-arm manipulaition with RSE.
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -67,8 +67,10 @@ class RobotTrajectoryAdapter(object):
         """
         
         # Create the object trajectory based on the template choice
-        if (template=="simple pick and place"):
-            trajectory = create_simple_move_trajectory(start_pose, goal_pose, self.lift_height, self.speed)
+        if (template=="simple move"):
+            trajectory = create_simple_move_trajectory(start_pose, goal_pose, self.speed, ref_frame)
+        elif (template=="pick_and_place"):
+            trajectory = create_pick_and_place_trajectory(start_pose, goal_pose, self.speed, ref_frame)
         else:
             rospy.logerr("Trajectory type not found")
             
@@ -158,12 +160,6 @@ class RobotTrajectoryAdapter(object):
         poses.poses = pose_list
         
         return poses
-    
-    def check_trajectories(self, parsed_trajectory, follow_trajectory):
-        """
-        TODO
-        """
-        pass
         
     def pose_to_frame_matrix(self, pose_in):
         """
@@ -192,8 +188,6 @@ class RobotTrajectoryAdapter(object):
     def frame_matrix_to_pose(self, frame_matrix):
         """
         Convert a transfromation matrix into a pose.
-        
-        NOTE: quaternions may not be functioning correctly; needs more tests
         """
         
         # Get translation of frame

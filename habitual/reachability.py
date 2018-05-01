@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 """
-  TODO: module description
+  Function(s) for determining the reachability of poses with the WidowX 
+  robotic arm.
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:

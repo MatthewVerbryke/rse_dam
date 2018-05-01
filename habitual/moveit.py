@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  TODO: module description
+  Moveit interface submodule for RSE.
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -83,12 +83,9 @@ class RSEMoveItInterface(object):
         self.arm.allow_replanning(True)
         
         # Add tolerence to goal position and orientation
-        self.arm.set_goal_position_tolerance(0.1)
-        self.arm.set_goal_orientation_tolerance(0.1)
+        self.arm.set_goal_position_tolerance(0.075)
+        self.arm.set_goal_orientation_tolerance(0.05)
         rospy.loginfo("MoveIt! interface initialized")
-        
-        # Set up a subscriber to listen for goal pose commands
-        #rospy.Subscriber("{}_pose_command".format(planning_group), PoseStamped, self.get_target_pose)
         
         # Setup a connection to the 'compute_ik' service
         self.ik_srv = rospy.ServiceProxy("/compute_ik", GetPositionIK)
@@ -99,6 +96,9 @@ class RSEMoveItInterface(object):
         self.fk_srv = rospy.ServiceProxy("/compute_fk", GetPositionFK)
         self.fk_srv.wait_for_service()
         rospy.loginfo("FK service initialized")
+        
+        # Initialize a class variable for the most recently produced plan
+        self.trajectory = None
         
     def plan_to_pose_goal(self, pose):
         """
@@ -116,9 +116,7 @@ class RSEMoveItInterface(object):
         self.arm.set_pose_target(target_pose, self.eef_link)
 
         # Plan the trajectory
-        trajectory_plan = self.arm.plan()
-
-        return trajectory_plan
+        self.trajectory = self.arm.plan()
         
     def plan_to_joint_angle_goal(self, joint_angles):
         """
@@ -133,9 +131,7 @@ class RSEMoveItInterface(object):
         self.arm.set_joint_value_target(joint_angles)
         
         # Plan the trajectory
-        trajectory_plan = self.arm.plan()
-        
-        return trajectory_plan
+        self.trajectory = self.arm.plan()
         
     def plan_to_cartesian_path(self, waypoints):
         """
@@ -154,7 +150,7 @@ class RSEMoveItInterface(object):
         self.arm.set_named_target(named_pose)
         
         # Plan the trajectory
-        trajectory_plan = self.arm.plan()
+        self.trajectory = self.arm.plan()
         
     def get_eef_poses_from_trajectory(self, trajectory):
         """
@@ -202,15 +198,16 @@ class RSEMoveItInterface(object):
         """
         
         # Initialize trajectory
-        trajectory = RobotTrajectory()
-        trajectory.joint_trajectory.header.seq = copy.deepcopy(points_array.header.seq)
-        trajectory.joint_trajectory.header.stamp = rospy.Time.now()
-        trajectory.joint_trajectory.header.frame_id = self.ref_frame
-        trajectory.joint_trajectory.joint_names = self.joint_names
+        self.trajectory = RobotTrajectory()
+        self.trajectory.joint_trajectory.header.seq = copy.deepcopy(points_array.header.seq)
+        self.trajectory.joint_trajectory.header.stamp = rospy.Time.now()
+        self.trajectory.joint_trajectory.header.frame_id = self.ref_frame
+        self.trajectory.joint_trajectory.joint_names = self.joint_names
         
         # Loop setup
         poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
+        joint_positions = 
         
         # Build an array of JointTrajectoryPoint waypoints
         for i in range(0,poses_tot):
@@ -219,7 +216,7 @@ class RSEMoveItInterface(object):
             reachable = is_pose_reachable(points_array.poses[i])
             
             # Get the joint states using IK
-            resp = self.ik_solve(points_array.poses[i])
+            resp = self.ik_solve(points_array.poses[i], joint_positions)
                         
             # Initialize JointTrajectoryPoint message
             trajectory_point = JointTrajectoryPoint()
@@ -238,11 +235,7 @@ class RSEMoveItInterface(object):
             trajectory_points[i] = trajectory_point
             
         # Put waypoints into the trajectory
-        trajectory.joint_trajectory.points = trajectory_points
-        
-        #TODO: get velocities
-        
-        return trajectory
+        self.trajectory.joint_trajectory.points = trajectory_points
         
     def move_gripper(self, gripper_goal):
         """
@@ -258,14 +251,14 @@ class RSEMoveItInterface(object):
         # Wait a second
         rospy.sleep(1)
         
-    def execute_trajectory(traj_plan):
+    def execute_trajectory(self):
         """
         Execute the given trajectory plan.
         """
         
         # Execute the generated plan
         rospy.loginfo("Excuting trajectory...")
-        self.arm.execute(plan)
+        self.arm.execute(self.trajectory)
                 
         # Wait a second
         rospy.sleep(1)
@@ -306,7 +299,7 @@ class RSEMoveItInterface(object):
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
         
-    def ik_solve(self, pose):
+    def ik_solve(self, pose, feed_joint_state=[0,0,0,0,0]):
         """ 
         Given a end-effector pose, use inverse kinematics to determine the
         nessecary joint angles to reach the pose.
@@ -318,7 +311,7 @@ class RSEMoveItInterface(object):
         req = GetPositionIKRequest()
         req.ik_request.group_name = self.planning_group
         req.ik_request.robot_state.joint_state.name = self.joint_names
-        req.ik_request.robot_state.joint_state.position = [0, 0, 0, 0, 0]
+        req.ik_request.robot_state.joint_state.position = feed_joint_state
         req.ik_request.avoid_collisions = True        
         req.ik_request.ik_link_name = self.eef_link
         req.ik_request.pose_stamped = pose
@@ -334,7 +327,7 @@ class RSEMoveItInterface(object):
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
     
-    def get_velocities(self, traj):
+    def get_velocities(self):
         """
         TODO
         """
