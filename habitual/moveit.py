@@ -20,6 +20,7 @@ import moveit_commander
 from moveit_msgs.msg import RobotTrajectory
 from moveit_msgs.srv import GetPositionIK, GetPositionIKRequest, GetPositionIKResponse
 from moveit_msgs.srv import GetPositionFK, GetPositionFKRequest, GetPositionFKResponse
+from sensor_msgs.msg import JointState
 import rospy
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -47,7 +48,7 @@ class RSEMoveItInterface(object):
         """
         
         # Get the planning group and reference frame
-        # TODO: PASS IN THROUGH ARGUMENTATION
+        # TODO: PASS IN THROUGH PARAM
         self.planning_group = ARM_GROUP
         gripper_group = GRIPPER_GROUP
         self.ref_frame = REF_FRAME
@@ -79,11 +80,12 @@ class RSEMoveItInterface(object):
         self.target_ref_frame = self.ref_frame
         self.arm.set_pose_reference_frame(self.ref_frame)
         
-        # Allow for replanning
-        self.arm.allow_replanning(True)
+        # Initialize a class variable for the most recently produced plan
+        self.trajectory = None
         
-        # Add tolerence to goal position and orientation
-        self.arm.set_goal_position_tolerance(0.075)
+        # Setup planning parameters
+        self.arm.allow_replanning(True)
+        self.arm.set_goal_position_tolerance(0.001)
         self.arm.set_goal_orientation_tolerance(0.05)
         rospy.loginfo("MoveIt! interface initialized")
         
@@ -97,8 +99,29 @@ class RSEMoveItInterface(object):
         self.fk_srv.wait_for_service()
         rospy.loginfo("FK service initialized")
         
-        # Initialize a class variable for the most recently produced plan
-        self.trajectory = None
+    def plan_to_target(self, goal):
+        """
+        Condensed planning function for all allowed target types. Still 
+        WIP.
+        
+        TODO: FINISH IT
+        """
+        
+        # Setup
+        self.arm.set_start_state_to_current_state()
+        self.arm.clear_pose_targets()
+        goal_type = type(goal)
+        
+        # Determine nessecary setup action from goal type
+        if (type(goal_type)==Pose):
+            pass
+        elif(type(goal_type)==JointState):
+            pass
+        elif(type(goal_type)==str):     
+            self.arm.set_named_target(goal)
+        
+        # Plan the trajectory
+        self.trajectory = self.arm.plan()
         
     def plan_to_pose_goal(self, pose):
         """
@@ -207,7 +230,7 @@ class RSEMoveItInterface(object):
         # Loop setup
         poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
-        joint_positions = 
+        #TODO: feed in initial joint states?
         
         # Build an array of JointTrajectoryPoint waypoints
         for i in range(0,poses_tot):
@@ -262,12 +285,6 @@ class RSEMoveItInterface(object):
                 
         # Wait a second
         rospy.sleep(1)
-        
-    def get_target_pose(self, msg):
-        """
-        Callback function for the pose goal.
-        """
-        self.pose_command = msg
         
     def get_current_eef_pose(self):
         """

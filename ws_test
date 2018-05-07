@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+
+
+import sys
+import time
+from std_msgs.msg import Int8
+
+file_dir = sys.path[0]
+sys.path.append(file_dir + '/..')
+from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
+from rss_git_lite.common import rosConnectWrapper as rC
+
+if __name__ == "__main__":    
+    
+    computer = raw_input("left or right computer? ")
+    pub_or_sub = raw_input("publishing(p) or subscribing(s)? ")
+    
+    if computer=="left":
+        connection = "ws://192.168.0.100:9090/"
+    elif computer=="right":
+        connection = "ws://192.168.0.101:9090/"
+    else:
+        connection = "ws://localhost:9090/"
+
+    if (pub_or_sub=="s"):
+        # sub test
+        pass
+                
+    elif (pub_or_sub=="p"):
+        # pub test
+        
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/runtype', 'std_msgs/Int8', ws4pyROS.pack_runtype)
+        while (1):
+            ws.send(42)
+            time.sleep(0.5)
+            print("runtype sent!")
+
+        ws.close()
+        
+    
