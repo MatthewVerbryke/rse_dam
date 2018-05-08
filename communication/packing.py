@@ -18,7 +18,7 @@
 
 
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
-from std_msgs import Header
+from std_msgs.msg import Header
 
 
 def pack_header(header):
@@ -56,7 +56,7 @@ def unpack_header(dictmsg):
     header.seq = seq
     header.stamp.secs = sec
     header.stamp.nsecs = nsec
-    header.frame_id = frame
+    header.frame_id = str(frame)
     
     return header
     
@@ -67,17 +67,17 @@ def pack_pose(pose):
     """
     
     # Get pose info
-    x = posearray.poses[i].position.x
-    y = posearray.poses[i].position.y
-    z = posearray.poses[i].position.z
-    qx = posearray.poses[i].orientation.x
-    qy = posearray.poses[i].orientation.y
-    qz = posearray.poses[i].orientation.z
-    qw = posearray.poses[i].orientation.w
+    x = pose.position.x
+    y = pose.position.y
+    z = pose.position.z
+    qx = pose.orientation.x
+    qy = pose.orientation.y
+    qz = pose.orientation.z
+    qw = pose.orientation.w
     
     # Package into dict
     pose_msg = {"position": {"x": x, "y": y, "z": z},
-                 "orientation": {"x": qx, "y": qy, "z": qz, "w": qw}}
+                "orientation": {"x": qx, "y": qy, "z": qz, "w": qw}}
     
     return pose_msg
     
@@ -88,13 +88,13 @@ def unpack_pose(dictmsg):
     
     # Get info from message
     pose_msg = dictmsg["msg"]
-    x = msg["position"]["x"]
-    y = msg["position"]["y"]
-    z = msg["position"]["z"]
-    qx = msg["orientation"]["x"]
-    qy = msg["orientation"]["y"]
-    qz = msg["orientation"]["z"]
-    qw = msg["orientation"]["w"]
+    x = pose_msg["position"]["x"]
+    y = pose_msg["position"]["y"]
+    z = pose_msg["position"]["z"]
+    qx = pose_msg["orientation"]["x"]
+    qy = pose_msg["orientation"]["y"]
+    qz = pose_msg["orientation"]["z"]
+    qw = pose_msg["orientation"]["w"]
     
     # Package into ROS msg
     pose = Pose()
@@ -121,8 +121,8 @@ def pack_posestamped(posestamped):
     # Package into dict
     posestamped_msg = {"header": header_msg,
                        "pose": pose_msg}
-                       
-    return posestamped
+                
+    return posestamped_msg
     
 def unpack_posestamped(dictmsg):
     """

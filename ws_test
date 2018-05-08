@@ -3,37 +3,64 @@
 
 import sys
 import time
-from std_msgs.msg import Int8
+import communication.packing as compack
 
 file_dir = sys.path[0]
 sys.path.append(file_dir + '/..')
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 from rss_git_lite.common import rosConnectWrapper as rC
+from std_msgs.msg import Header
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped
+
 
 if __name__ == "__main__":    
-    
-    computer = raw_input("left or right computer? ")
+
     pub_or_sub = raw_input("publishing(p) or subscribing(s)? ")
-    
-    if computer=="left":
-        connection = "ws://192.168.0.100:9090/"
-    elif computer=="right":
-        connection = "ws://192.168.0.101:9090/"
-    else:
-        connection = "ws://localhost:9090/"
+    connection = "ws://192.168.0.51:9090/" #left-to-right
+    #connection = "ws://192.168.0.50:9090/" #right-to-left
 
     if (pub_or_sub=="s"):
         # sub test
-        pass
+        
+        ws = rC.RosMsg('ws4py', connection, 'sub', '/pose_test', 'geometry_msgs/PoseStamped', compack.unpack_posestamped)
+        
+        out = None
+        while (out is None):
+            out = ws.receive()
+            if out is None:
+                print("No data recieved yet")
+            else:
+                print("Data recieved!")
+                print(out)
+            time.sleep(0.5)
                 
     elif (pub_or_sub=="p"):
         # pub test
         
-        ws = rC.RosMsg('ws4py', connection, 'pub', '/runtype', 'std_msgs/Int8', ws4pyROS.pack_runtype)
+        header = Header()
+        header.seq = 0
+        header.stamp.secs = 1
+        header.stamp.nsecs = 100000000
+        header.frame_id = "world"
+        
+        goal_pose = PoseStamped()
+        goal_pose.header.seq = 0
+        goal_pose.header.stamp.secs = 1
+        goal_pose.header.stamp.nsecs = 100000000
+        goal_pose.header.frame_id = "world"
+        goal_pose.pose.position.x = 0.2
+        goal_pose.pose.position.y = 0.1
+        goal_pose.pose.position.z = 0.0
+        goal_pose.pose.orientation.x = 1.0
+        goal_pose.pose.orientation.y = 0.0
+        goal_pose.pose.orientation.z = 0.0
+        goal_pose.pose.orientation.w = 0.0
+        
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/posestamped_test', 'geometry_msgs/PoseStamped', compack.pack_posestamped)
         while (1):
-            ws.send(42)
+            ws.send(goal_pose)
             time.sleep(0.5)
-            print("runtype sent!")
+            print("msg sent!")
 
         ws.close()
         
