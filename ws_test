@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 import sys
 import time
 import communication.packing as compack
@@ -11,6 +10,8 @@ from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 from rss_git_lite.common import rosConnectWrapper as rC
 from std_msgs.msg import Header
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
+from moveit_msgs.msg import RobotTrajectory
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 
 if __name__ == "__main__":    
@@ -43,22 +44,64 @@ if __name__ == "__main__":
         header.stamp.nsecs = 100000000
         header.frame_id = "world"
         
-        goal_pose = PoseStamped()
-        goal_pose.header.seq = 0
-        goal_pose.header.stamp.secs = 1
-        goal_pose.header.stamp.nsecs = 100000000
-        goal_pose.header.frame_id = "world"
-        goal_pose.pose.position.x = 0.2
-        goal_pose.pose.position.y = 0.1
-        goal_pose.pose.position.z = 0.0
-        goal_pose.pose.orientation.x = 1.0
-        goal_pose.pose.orientation.y = 0.0
-        goal_pose.pose.orientation.z = 0.0
-        goal_pose.pose.orientation.w = 0.0
+        goal_pose = Pose()
+        goal_pose.position.x = 0.2
+        goal_pose.position.y = 0.1
+        goal_pose.position.z = 0.0
+        goal_pose.orientation.x = 1.0
+        goal_pose.orientation.y = 0.0
+        goal_pose.orientation.z = 0.0
+        goal_pose.orientation.w = 0.0
         
-        ws = rC.RosMsg('ws4py', connection, 'pub', '/posestamped_test', 'geometry_msgs/PoseStamped', compack.pack_posestamped)
+        goal_pose1 = Pose()
+        goal_pose1.position.x = 0.3
+        goal_pose1.position.y = 0.2
+        goal_pose1.position.z = 0.1
+        goal_pose1.orientation.x = 0.0
+        goal_pose1.orientation.y = 1.0
+        goal_pose1.orientation.z = 0.0
+        goal_pose1.orientation.w = 0.0
+        
+        goal_pose2 = Pose()
+        goal_pose2.position.x = 0.4
+        goal_pose2.position.y = 0.3
+        goal_pose2.position.z = 0.2
+        goal_pose2.orientation.x = 0.0
+        goal_pose2.orientation.y = 0.0
+        goal_pose2.orientation.z = 1.0
+        goal_pose2.orientation.w = 0.0
+        
+        test_parray = PoseArray()
+        test_parray.header = header
+        test_parray.poses.append(goal_pose)
+        test_parray.poses.append(goal_pose1)
+        test_parray.poses.append(goal_pose2)
+        
+        jt_point1 = JointTrajectoryPoint()
+        jt_point1.positions = [0.0, 1.0, 2.0]
+        jt_point1.time_from_start.secs = 0
+        jt_point1.time_from_start.nsecs = 00000000
+        
+        jt_point2 = JointTrajectoryPoint()
+        jt_point2.positions = [1.0, 2.0, 3.0]
+        jt_point2.time_from_start.secs = 0
+        jt_point2.time_from_start.nsecs = 10000000
+        
+        jt_point3 = JointTrajectoryPoint()
+        jt_point3.positions = [2.0, 3.0, 4.0]
+        jt_point3.time_from_start.secs = 0
+        jt_point3.time_from_start.nsecs = 20000000
+        
+        test_traj = RobotTrajectory()
+        test_traj.joint_trajectory.header = header
+        test_traj.joint_trajectory.joint_names = ["joint_1", "joint_2", "joint_3"]
+        test_traj.joint_trajectory.points.append(jt_point1)
+        test_traj.joint_trajectory.points.append(jt_point2)
+        test_traj.joint_trajectory.points.append(jt_point3)
+        
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/pa_test', 'geometry_msgs/PoseArray', compack.pack_posearray)
         while (1):
-            ws.send(goal_pose)
+            ws.send(test_parray)
             time.sleep(0.5)
             print("msg sent!")
 

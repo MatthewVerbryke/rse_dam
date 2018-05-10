@@ -153,10 +153,7 @@ def pack_posearray(posearray):
     
     TODO: TEST
     """
-    
-    # Determine if using pose or posestamped
-    pose_type = type(posearray.poses[0])
-    
+
     # Get header messages
     header_msg = pack_header(posearray.header)
     
@@ -166,10 +163,7 @@ def pack_posearray(posearray):
 
     # Get and store a message for each pose
     for i in range(0,pose_num):
-        if (posetype=="Pose"):
-            pose_msg_i = pack_pose(posearray.poses[i])
-        elif (posetype=="Pose"):
-            pose_msg_i = pack_posestamed(posearray.poses[i])
+        pose_msg_i = pack_pose(posearray.poses[i])
         pose_list_msg[i] = pose_msg_i
         
     # Package into a dict
@@ -209,28 +203,26 @@ def unpack_diagnosticarray(dictmsg):
 def pack_robottrajectory(robottrajectory):
     """
     Package 'geometry_msgs/PoseStamped' message.
-    
-    TODO: TEST
     """
     
     # Get header message
-    jt_header_msg = pack_header(robottrajectory.joint_trajectory)
+    jt_header_msg = pack_header(robottrajectory.joint_trajectory.header)
     
     # Get joint name message
-    joint_name_msg = {"joint_names": robottrajectory.joint_trajectory.joint_names}
+    joint_list = robottrajectory.joint_trajectory.joint_names
     
     # Setup loop
     jtpoints_num = len(robottrajectory.joint_trajectory.points)
     jtpoints_list = [None]*jtpoints_num
     
     # Get messages for all JointTrajectoryPoints
-    for i in range(0,jtpoint_num):
+    for i in range(0,jtpoints_num):
         
         # Get info from current point
         current_point = robottrajectory.joint_trajectory.points[i]
         positions = current_point.positions
         velocities = current_point.velocities
-        acceleration = current_point.acceleration
+        accelerations = current_point.accelerations
         effort = current_point.effort
         time_secs = current_point.time_from_start.secs
         time_nsecs = current_point.time_from_start.nsecs
@@ -240,15 +232,15 @@ def pack_robottrajectory(robottrajectory):
                        "velocities": velocities,
                        "accelerations": accelerations,
                        "effort": effort,
-                       "time_from_start", {"secs", time_secs, "nsecs", time_nsecs}}
+                       "time_from_start": {"secs": time_secs, "nsecs": time_nsecs}}
         
         # Put into list
         jtpoints_list[i] = jtpoint_msg
         
     # Assemble the message
     rt_msg = {"joint_trajectory": {"header": jt_header_msg,
-                                   "joint_names": joint_name_msg,
-                                   "points": jtpoints_list}
+                                   "joint_names": joint_list,
+                                   "points": jtpoints_list},
               "multi_dof_joint_trajectory": {}} # <-- okay being empty?
               
     return rt_msg
