@@ -148,10 +148,10 @@ def traj_test():
     speed = 0.05 #m/s
     lift_height = 0.1
     
-    trajectory = create_simple_move_trajectory(start_pose, goal_pose, speed)    
+    trajectory, timestamps = create_simple_move_trajectory(start_pose, goal_pose, speed, REF_FRAME)    
     #trajectory = create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed)
 
-    print_traj = True
+    print_traj = False
     
     if print_traj:
         for i in range(0,len([trajectory])):
@@ -171,6 +171,7 @@ def traj_test():
             ax.set_zlabel('Z Label')
             plt.show()
     print trajectory
+    print timestamps
     return trajectory 
     
 def frame_to_pose_test():
@@ -313,9 +314,9 @@ def ik_traj_test2():
 #ik_test()
 #ik_serv_test()
 #fk_serv_test()
-#traj_test()
+traj_test()
 #frame_to_pose_test()
 #arm_pose_test()
 #ik_traj_test()
-ik_traj_test2()
+#ik_traj_test2()
 

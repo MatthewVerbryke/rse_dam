@@ -68,13 +68,13 @@ class RobotTrajectoryAdapter(object):
         
         # Create the object trajectory based on the template choice
         if (template=="simple move"):
-            trajectory = create_simple_move_trajectory(start_pose, goal_pose, self.speed, ref_frame)
+            trajectory, timesteps = create_simple_move_trajectory(start_pose, goal_pose, self.speed, ref_frame)
         elif (template=="pick_and_place"):
             trajectory = create_pick_and_place_trajectory(start_pose, goal_pose, self.speed, ref_frame)
         else:
             rospy.logerr("Trajectory type not found")
             
-        return trajectory
+        return trajectory, timesteps
         
     def compute_eef_offset(self, frame_1, frame_2):
         """
@@ -121,10 +121,12 @@ class RobotTrajectoryAdapter(object):
 
         return offset
         
-    def adapt_arm_poses(self, object_poses, offset):
+    def adapt_arm_poses(self, object_poses, timestamps, offset):
         """
         Create an array of poses for the arm based on the object pose array,
         using the predetermined offset.
+        
+        TODO: TEST
         """
         
         # Setup resultant PoseArray
@@ -145,17 +147,14 @@ class RobotTrajectoryAdapter(object):
             eef_matrix = np.dot(object_matrix, offset)
             pose_i = self.frame_matrix_to_pose(eef_matrix)
             
-            # Create pose stamped from the pose output
-            pose_stamped_i = PoseStamped()
-            pose_stamped_i.header.seq = copy.deepcopy(object_poses.poses[i].header.seq)
-            pose_stamped_i.header.stamp = copy.deepcopy(object_poses.poses[i].header.stamp)
-            pose_stamped_i.header.frame_id = 1
-            pose_stamped_i.pose.position = pose_i.position
-            pose_stamped_i.pose.orientation = pose_i.orientation
-            
             # Store results
-            pose_list[i] = pose_stamped_i
+            pose_list[i] = pose_i
             
+            # Create pose from the pose output
+            #pose_out_i = Pose()
+            #pose_out_i.position = pose_i.position
+            #pose_out_i.orientation = pose_i.orientation
+        
         # Store final arrays in PoseArray's
         poses.poses = pose_list
         

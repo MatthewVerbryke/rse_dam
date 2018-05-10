@@ -48,36 +48,33 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     y_step = (goal_pose.position.y - start_pose.position.y)/traverse_wp_len
     z_step = (goal_pose.position.z - start_pose.position.z)/traverse_wp_len
     pose_list = [None]*(traverse_wp_len+1)
+    timestamps = []
     
-    # Fill out poses
+    # Fill out poses and timesteps
     for i in range(0, traverse_wp_len):
-        pose_i = PoseStamped()
-        pose_i.header.seq = i
-        sec, nsec = get_stamp(i*timestep)
-        pose_i.header.stamp.secs = sec
-        pose_i.header.stamp.nsecs = nsec
-        pose_i.header.frame_id = ref_frame
-        pose_i.pose.position.x = start_pose.position.x + x_step*i
-        pose_i.pose.position.y = start_pose.position.y + y_step*i
-        pose_i.pose.position.z = start_pose.position.z + z_step*i
-        pose_i.pose.orientation = start_pose.orientation
+        
+        # Get pose
+        pose_i = Pose()
+        pose_i.position.x = start_pose.position.x + x_step*i
+        pose_i.position.y = start_pose.position.y + y_step*i
+        pose_i.position.z = start_pose.position.z + z_step*i
+        pose_i.orientation = start_pose.orientation
         pose_list[i] = pose_i
         
+        # Get timestamp
+        sec, nsec = get_stamp(i*timestep)
+        timestamps.append({"secs": sec, "nsecs": nsec})        
+             
     # Place the goal point at the end as well
-    temp_pose = PoseStamped()
-    temp_pose.header.seq = i+1
-    sec, nsec = get_stamp((i+1)*timestep)
-    temp_pose.header.stamp.secs = sec
-    temp_pose.header.stamp.nsecs = nsec
-    temp_pose.header.frame_id = ref_frame
-    temp_pose.pose = copy.deepcopy(goal_pose)
+    temp_pose = copy.deepcopy(goal_pose)
     pose_list[traverse_wp_len] = temp_pose
-
+    sec, nsec = get_stamp((i+1)*timestep)
+    timestamps.append({"secs": sec, "nsecs": nsec})
+    
     # Package result
     trajectory.poses = pose_list
     
-    return trajectory
-    
+    return trajectory, timestamps
     
 def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed, ref_frame):
     """
@@ -88,7 +85,8 @@ def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed, 
     position, and then placing the object at the goal position. Assumes
     no obstacles are on the path for simplicity.
     
-    TODO: REWORK TO USE THE SIMPLER TRAJECTORY FOUND ABOVE
+    TODO: REWORK TO USE THE SIMPLER TRAJECTORY FOUND ABOVE AND WITHOUT 
+    POSESTAMPED.
     """
     
     timestep = 0.1

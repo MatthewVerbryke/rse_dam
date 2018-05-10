@@ -212,10 +212,12 @@ class RSEMoveItInterface(object):
         
         return poses_out
         
-    def get_trajectory_from_eef_poses(self, points_array):
+    def get_trajectory_from_eef_poses(self, points_array, time_stamps):
         """
         Given a list of time-stamped poses for the group, construct a 
         'RobotTrajectory'.
+        
+        TODO: TEST
         """
         
         # Initialize trajectory
@@ -228,7 +230,7 @@ class RSEMoveItInterface(object):
         # Loop setup
         poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
-        #TODO: feed in initial joint states?
+        feed_joint_state = self.arm.get_current_joint_values()
         
         # Build an array of JointTrajectoryPoint waypoints
         for i in range(0,poses_tot):
@@ -237,7 +239,8 @@ class RSEMoveItInterface(object):
             reachable = is_pose_reachable(points_array.poses[i])
             
             # Get the joint states using IK
-            resp = self.ik_solve(points_array.poses[i], joint_positions)
+            feed_joint_state = joint_posiitons
+            resp = self.ik_solve(points_array.poses[i], feed_joint_state)
                         
             # Initialize JointTrajectoryPoint message
             trajectory_point = JointTrajectoryPoint()
@@ -250,7 +253,7 @@ class RSEMoveItInterface(object):
         
             # Format the outputs
             trajectory_point.positions = joint_positions
-            trajectory_point.time_from_start = points_array.poses[i].header.stamp
+            trajectory_point.time_from_start = time_stamps[i]
             
             # Put the joint states into the outgoing array
             trajectory_points[i] = trajectory_point
@@ -314,7 +317,7 @@ class RSEMoveItInterface(object):
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
         
-    def ik_solve(self, pose, feed_joint_state=[0,0,0,0,0]):
+    def ik_solve(self, pose, feed_joint_state=[0.0,0.0,0.0,0.0,0.0]):
         """ 
         Given a end-effector pose, use inverse kinematics to determine the
         nessecary joint angles to reach the pose.
