@@ -15,7 +15,7 @@ from habitual.moveit import *
 from habitual.reachability import *
 
 
-REF_FRAME = "base_link"
+REF_FRAME = "origin_point"
 
 def offset_test():
     
@@ -278,16 +278,21 @@ def ik_traj_test2():
 
     start_pose = Pose()
     start_pose.position.x = 0.2
-    start_pose.position.y = 0.0
+    start_pose.position.y = 0.1
     start_pose.position.z = 0.2659
-    start_pose.orientation.x = -0.707107
-    start_pose.orientation.y = 0.0
-    start_pose.orientation.z = 0.0
-    start_pose.orientation.w = 0.707107
+    start_pose.orientation.x = 0.0
+    start_pose.orientation.y = -0.707107
+    start_pose.orientation.z = 0.707107
+    start_pose.orientation.w = 0.0
     
     goal_pose = Pose()
 
     interface.plan_to_pose_goal(start_pose)
+    for point in interface.trajectory.joint_trajectory.points:
+        point.velocities = []
+        point.accelerations = []
+        point.effort = []
+    print interface.trajectory
     interface.execute_trajectory()
     exit() 
     speed = 0.05 #m/s

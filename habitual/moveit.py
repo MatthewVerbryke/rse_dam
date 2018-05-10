@@ -30,7 +30,7 @@ from reachability import is_pose_reachable
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
 GRIPPER_GROUP = "widowx_gripper"
-REF_FRAME = "base_link"
+REF_FRAME = "origin_point"
 LAUNCH_RVIZ = False
 JOINT_NAMES = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
 
@@ -86,7 +86,7 @@ class RSEMoveItInterface(object):
         # Setup planning parameters
         self.arm.allow_replanning(True)
         self.arm.set_goal_position_tolerance(0.001)
-        self.arm.set_goal_orientation_tolerance(0.05)
+        self.arm.set_goal_orientation_tolerance(0.1)
         rospy.loginfo("MoveIt! interface initialized")
         
         # Setup a connection to the 'compute_ik' service
@@ -216,8 +216,6 @@ class RSEMoveItInterface(object):
         """
         Given a list of time-stamped poses for the group, construct a 
         'RobotTrajectory'.
-        
-        TODO: ADD VELOCITY INTEPOLATION
         """
         
         # Initialize trajectory
@@ -343,12 +341,6 @@ class RSEMoveItInterface(object):
             
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
-    
-    def get_velocities(self):
-        """
-        TODO
-        """
-        pass
         
     def cleanup(self):
         """

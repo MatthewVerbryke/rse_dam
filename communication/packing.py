@@ -150,8 +150,6 @@ def unpack_posestamped(dictmsg):
 def pack_posearray(posearray):
     """
     Package 'geometry_msgs/PoseArray' message.
-    
-    TODO: TEST
     """
 
     # Get header messages
