@@ -31,7 +31,7 @@ def is_pose_reachable(pose):
     """
     
     # Format the pose goal
-    pose_goal = [pose.pose.position.x, pose.pose.position.y, pose.pose.position.z]
+    pose_goal = [pose.position.x, pose.position.y, pose.position.z]
     
     # Get 1st vector
     vector_1 = [(ref_point_2[0] - ref_point_1[0]),
@@ -47,7 +47,7 @@ def is_pose_reachable(pose):
     normal = np.cross(vector_1, vector_2)
     
     # Convert the quarternion given into a rotation matrix for easy rotation
-    quat = [pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w]
+    quat = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
     hom_rot_matrix = tf.transformations.quaternion_matrix(quat)
     rot_matrix = hom_rot_matrix[0:3,0:3]
 

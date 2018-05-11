@@ -121,7 +121,7 @@ class RobotTrajectoryAdapter(object):
 
         return offset
         
-    def adapt_arm_poses(self, object_poses, timestamps, offset):
+    def adapt_arm_poses(self, object_poses, offset):
         """
         Create an array of poses for the arm based on the object pose array,
         using the predetermined offset.

@@ -12,6 +12,7 @@
 """
 
 
+import ast
 import copy
 import sys
  
@@ -212,12 +213,10 @@ class RSEMoveItInterface(object):
         
         return poses_out
         
-    def get_trajectory_from_eef_poses(self, points_array, time_stamps):
+    def get_trajectory_from_eef_poses(self, points_array, timestamp_string):
         """
-        Given a list of time-stamped poses for the group, construct a 
-        'RobotTrajectory'.
-        
-        TODO: TEST
+        Given a list of poses and a list of corrosponding timestamps for 
+        the group, construct a 'RobotTrajectory'.
         """
         
         # Initialize trajectory
@@ -231,6 +230,7 @@ class RSEMoveItInterface(object):
         poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
         feed_joint_state = self.arm.get_current_joint_values()
+        time_stamps = ast.literal_eval(timestamp_string)
         
         # Build an array of JointTrajectoryPoint waypoints
         for i in range(0,poses_tot):
@@ -238,10 +238,20 @@ class RSEMoveItInterface(object):
             # Check reachability
             reachable = is_pose_reachable(points_array.poses[i])
             
+            # Create PoseStamped for the current Pose (GetPositionIK requires PoseStamped)
+            pose_req = PoseStamped()
+            pose_req.header.seq = i
+            pose_req.header.stamp.secs = time_stamps[i]["secs"]
+            pose_req.header.stamp.nsecs = time_stamps[i]["nsecs"]
+            pose_req.header.frame_id = self.ref_frame
+            pose_req.pose = points_array.poses[i]
+            
             # Get the joint states using IK
-            feed_joint_state = joint_posiitons
-            resp = self.ik_solve(points_array.poses[i], feed_joint_state)
-                        
+            resp = self.ik_solve(pose_req, feed_joint_state)
+            if (resp.error_code.val!=1):
+                rospy.logerr("IK solver failed on waypoint {} with error code {}".format(i, resp.error_code.val))
+                return 0
+            
             # Initialize JointTrajectoryPoint message
             trajectory_point = JointTrajectoryPoint()
             joint_positions = [None]*5 
@@ -253,13 +263,19 @@ class RSEMoveItInterface(object):
         
             # Format the outputs
             trajectory_point.positions = joint_positions
-            trajectory_point.time_from_start = time_stamps[i]
+            trajectory_point.time_from_start.secs = time_stamps[i]["secs"]
+            trajectory_point.time_from_start.nsecs = time_stamps[i]["nsecs"]
             
             # Put the joint states into the outgoing array
             trajectory_points[i] = trajectory_point
             
+            # Set current joint positions as the feed to the next waypoint
+            feed_joint_state = joint_positions
+            
         # Put waypoints into the trajectory
         self.trajectory.joint_trajectory.points = trajectory_points
+        
+        return 1
         
     def move_gripper(self, gripper_goal):
         """

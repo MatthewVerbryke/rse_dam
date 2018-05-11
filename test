@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 
+import ast
 import rospy
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -151,6 +152,8 @@ def traj_test():
     trajectory, timestamps = create_simple_move_trajectory(start_pose, goal_pose, speed, REF_FRAME)    
     #trajectory = create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed)
 
+    timestamp_array = ast.literal_eval(str(timestamps))
+
     print_traj = False
     
     if print_traj:
@@ -247,26 +250,25 @@ def ik_traj_test():
     start_pose.orientation.w = 0.0
     
     goal_pose = Pose()
-    goal_pose.position.x = 0.3
-    goal_pose.position.y = 0.1
+    goal_pose.position.x = 0.2
+    goal_pose.position.y = 0.2
     goal_pose.position.z = 0.2659
     goal_pose.orientation.x = 0.0
     goal_pose.orientation.y = -0.707107
     goal_pose.orientation.z = 0.707107
     goal_pose.orientation.w = 0.0
-
+    
+    interface.arm.set_goal_orientation_tolerance(0.005)
     interface.plan_to_pose_goal(start_pose)
-    interface.execute_trajectory()
-    blah = raw_input("pause")
+    #print(interface.trajectory)
+    
+    interface.execute_trajectory()#; exit()
+    
     speed = 0.05 #m/s
+    obj_trajectory, timestamps = create_simple_move_trajectory(start_pose, goal_pose, speed, "base_link")
     
-    obj_trajectory = create_simple_move_trajectory(start_pose, goal_pose, speed, "base_link")
-    
-    for pose in obj_trajectory.poses:
-        is_pose_reachable(pose)
-    
-    interface.get_trajectory_from_eef_poses(obj_trajectory)
-    print(interface.trajectory)
+    interface.get_trajectory_from_eef_poses(obj_trajectory, str(timestamps))
+    #print(interface.trajectory)#; exit()
     interface.execute_trajectory()
     
     interface.cleanup()
@@ -289,34 +291,17 @@ def ik_traj_test2():
     goal_pose = Pose()
 
     interface.plan_to_pose_goal(start_pose)
-    for point in interface.trajectory.joint_trajectory.points:
-        point.velocities = []
-        point.accelerations = []
-        point.effort = []
-    print interface.trajectory
     interface.execute_trajectory()
-    exit() 
-    speed = 0.05 #m/s
-
-    obj_trajectory = create_simple_move_trajectory(start_pose, goal_pose, speed, "base_link")
-    
-    for pose in obj_trajectory.poses:
-        is_pose_reachable(pose)
-    
-    interface.get_trajectory_from_eef_poses(obj_trajectory)
-    print(interface.trajectory)
-    interface.execute_trajectory()
-    
-    interface.cleanup()
+    exit()
 
         
 #offset_test()
 #ik_test()
 #ik_serv_test()
 #fk_serv_test()
-traj_test()
+#traj_test()
 #frame_to_pose_test()
 #arm_pose_test()
-#ik_traj_test()
+ik_traj_test()
 #ik_traj_test2()
 
