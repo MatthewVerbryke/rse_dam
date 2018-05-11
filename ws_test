@@ -23,7 +23,7 @@ if __name__ == "__main__":
     if (pub_or_sub=="s"):
         # sub test
         
-        ws = rC.RosMsg('ws4py', connection, 'sub', '/pose_test', 'geometry_msgs/PoseStamped', compack.unpack_posestamped)
+        ws = rC.RosMsg('ws4py', connection, 'sub', '/string_test', 'std_msgs/String', compack.unpack_string)
         
         out = None
         while (out is None):
@@ -43,6 +43,10 @@ if __name__ == "__main__":
         header.stamp.secs = 1
         header.stamp.nsecs = 100000000
         header.frame_id = "world"
+        
+        test_timestamp_array = str([{"secs": 0, "nsecs": 10000000},
+                                    {"secs": 0, "nsecs": 20000000}, 
+                                    {"secs": 0, "nsecs": 50000000}])
         
         goal_pose = Pose()
         goal_pose.position.x = 0.2
@@ -99,9 +103,9 @@ if __name__ == "__main__":
         test_traj.joint_trajectory.points.append(jt_point2)
         test_traj.joint_trajectory.points.append(jt_point3)
         
-        ws = rC.RosMsg('ws4py', connection, 'pub', '/pa_test', 'geometry_msgs/PoseArray', compack.pack_posearray)
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/ta_test', 'std_msgs/String', compack.pack_string)
         while (1):
-            ws.send(test_parray)
+            ws.send(test_timestamp_array)
             time.sleep(0.5)
             print("msg sent!")
 

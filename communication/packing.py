@@ -5,10 +5,11 @@
   messages for use with rosbridge. Includes functions for:
   
     -std_msgs/Header
+    -std_msgs/String
     -geometry_msgs/Pose
     -geometry_msgs/PoseStamped
-    -geometry_msgs/PoseArray
-    -moveit_msgs/RobotTrajectory
+    -geometry_msgs/PoseArray     (WIP)
+    -moveit_msgs/RobotTrajectory (WIP) 
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -21,7 +22,7 @@
 
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from moveit_msgs.msg import RobotTrajectory
-from std_msgs.msg import Header
+from std_msgs.msg import Header, String
 
 
 def pack_header(header):
@@ -63,6 +64,32 @@ def unpack_header(dictmsg):
     
     return header
     
+    
+def pack_string(string):
+    """
+    Package 'std_msgs/String' message.
+    """
+    
+    # Place string into dictionary
+    data = string
+    string_msg = {"data": data}
+    
+    return string_msg
+    
+def unpack_string(dictmsg):
+    """
+    Unpackage 'std_msgs/String' message.
+    """
+    
+    # Get info from message
+    string_data = dictmsg["msg"]["data"]
+    
+    # Package into ROS message
+    string = String()
+    string.data = str(string_data)
+    
+    return string
+
 
 def pack_pose(pose):
     """
@@ -239,7 +266,7 @@ def pack_robottrajectory(robottrajectory):
     rt_msg = {"joint_trajectory": {"header": jt_header_msg,
                                    "joint_names": joint_list,
                                    "points": jtpoints_list},
-              "multi_dof_joint_trajectory": {}} # <-- okay being empty?
+              "multi_dof_joint_trajectory": {}}# <-- left empty by me since I don't need it; add it in if you do.
               
     return rt_msg
 
