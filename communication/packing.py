@@ -8,8 +8,9 @@
     -std_msgs/String
     -geometry_msgs/Pose
     -geometry_msgs/PoseStamped
-    -geometry_msgs/PoseArray     (WIP)
-    -moveit_msgs/RobotTrajectory (WIP) 
+    -geometry_msgs/PoseArray     (packing only)
+    -sensor_msgs/JointState      (packing only)
+    -moveit_msgs/RobotTrajectory (packing only) 
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -22,6 +23,7 @@
 
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from moveit_msgs.msg import RobotTrajectory
+from sensor_msgs.msg import JointState
 from std_msgs.msg import Header, String
 
 
@@ -209,6 +211,38 @@ def unpack_posearray(dictmsg):
     header_msg = {"msg": posearray_msg["header"]}
     header = unpack_header(header_msg)
     
+    pass
+
+
+def pack_jointstate(jointstate):
+    """
+    Package 'sensor_msgs/JointState' message
+    
+    TODO: Test
+    """
+    
+    # Get header message
+    header_msg = pack_header(jointstate.header)
+    
+    # Get joint state info
+    names = jointstate.name
+    positions = jointstate.position
+    velocities = jointstate.velocity
+    efforts = jointstate.effort
+    
+    # Package into dict
+    jointstate_msg = {"header": header_msg,
+                      "name": names,
+                      "position": positions,
+                      "velocity": velocities,
+                      "effort": efforts}
+                      
+    return jointstate_msg
+    
+def unpack_jointstate(datalist):
+    """
+    TODO
+    """
     pass
 
 

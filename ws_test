@@ -12,6 +12,7 @@ from std_msgs.msg import Header
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from moveit_msgs.msg import RobotTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
+from sensor_msgs.msg import JointState
 
 
 if __name__ == "__main__":    
@@ -103,9 +104,16 @@ if __name__ == "__main__":
         test_traj.joint_trajectory.points.append(jt_point2)
         test_traj.joint_trajectory.points.append(jt_point3)
         
-        ws = rC.RosMsg('ws4py', connection, 'pub', '/ta_test', 'std_msgs/String', compack.pack_string)
+        test_js = JointState()
+        test_js.header = header
+        test_js.name = ["joint_1", "joint_2", "joint_3"]
+        test_js.position = [1.0, 2.0, 3.0]
+        test_js.velocity = [2.0, 3.0, 4.0]
+        test_js.effort = [0.0, 0.0, 0.0]
+        
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/js_test', 'sensor_msgs/JointState', compack.pack_jointstate)
         while (1):
-            ws.send(test_timestamp_array)
+            ws.send(test_js)
             time.sleep(0.5)
             print("msg sent!")
 
