@@ -4,6 +4,7 @@
   Functions for direct packing/unpacking of ROS message types into JSON 
   messages for use with rosbridge. Includes functions for:
   
+    -std_msgs/Float64
     -std_msgs/Header
     -std_msgs/String
     -geometry_msgs/Pose
@@ -24,7 +25,26 @@
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from moveit_msgs.msg import RobotTrajectory
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Header, String
+from std_msgs.msg import Header, String, Float64
+
+
+def pack_float64(float_num):
+    """
+    Package 'std_msgs/Float64' message.
+    """
+    
+    # Place Float into dict
+    data = float_num
+    float_msg = {"data": data}
+    
+    return float_msg
+    
+
+def unpack_float64(float_num):
+    """
+    TODO
+    """
+    pass
 
 
 def pack_header(header):
