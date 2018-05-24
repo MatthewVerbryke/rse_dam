@@ -38,13 +38,22 @@ def pack_float64(float_num):
     float_msg = {"data": data}
     
     return float_msg
-    
 
-def unpack_float64(float_num):
+def unpack_float64(dict_msg):
     """
-    TODO
+    Unpackage 'std_msgs/Float64' message.
+    
+    TODO: TEST
     """
-    pass
+    
+    # Get info from message
+    float_data = dictmsg["msg"]["data"]
+    
+    # Package into ROS message
+    float_out = Float64()
+    float_out.data = float(float_data)
+    
+    return float_out
 
 
 def pack_header(header):
@@ -164,6 +173,8 @@ def unpack_pose(dictmsg):
 def pack_posestamped(posestamped):
     """
     Package 'geometry_msgs/PoseStamped' message.
+    
+    TODO: TEST
     """
     
     # Get header and pose messages
@@ -237,8 +248,6 @@ def unpack_posearray(dictmsg):
 def pack_jointstate(jointstate):
     """
     Package 'sensor_msgs/JointState' message
-    
-    TODO: Test
     """
     
     # Get header message

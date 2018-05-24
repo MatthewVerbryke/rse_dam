@@ -88,6 +88,7 @@ class ArmStatePublisher():
             # Send the states out at the appropriate time
             if rospy.Time.now() > self.r_next:
                 ws.send(self.robot_joint_state)
+                time.sleep(0.01)
 
     def cleanup(self):
         """

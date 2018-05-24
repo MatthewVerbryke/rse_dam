@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  For the multicomputer setup, this node publishes the joints state 
+  For the multicomputer setup, this node publishes the commands 
   for arms on a different computer than the Gazebo simulation. 
 
   Copyright 2018 University of Cincinnati
@@ -36,7 +36,7 @@ ARM = "right"
 class JointCommandsPublisher():
     """ WARN: Robot specific and very crude/WIP"""
     
-    def __init__(self, get inputs)
+    def __init__(self):
     
         # Get Inputs
         self.connection = CONNECTION
@@ -57,53 +57,57 @@ class JointCommandsPublisher():
         self.r_delta = rospy.Duration(1.0/rospy.get_param("~read_rate", 10.0))
         self.r_next = rospy.Time.now() + self.r_delta
 
-        ws = []
-        subs = []
+        self.ws = []
+        self.subs = []
+        
+        callbacks = [self.joint_1_cb,self.joint_2_cb,self.joint_3_cb,self.joint_4_cb,self.joint_5_cb,self.gripper_joint_cb]
         
         # Setup ROSbridge publishers and ROSsubscribers
-        for joint in joint_names:
-            topic = self.robot + "/" + self.arm + "_" + joint + "_controller/command"
-            callback = self.joint+"_cb"
-            subs.append(rospy.Subscriber(topic, JointState, callback))
-            ws.append(rC.RosMsg("ws4py", self.connection, "pub", topic, "std_msgs/Float64", pack_Float64))
+        for i in range(0,len(self.joint_names)):
+            topic = self.robot + "/" + self.arm + "_" + self.joint_names[i] + "_controller/command"
+            self.subs.append(rospy.Subscriber(topic, Float64, callbacks[i]))
+            self.ws.append(rC.RosMsg("ws4py", self.connection, "pub", topic, "std_msgs/Float64", pack_float64))
         
         # Run publishers
-        self.publish_joint_commands
+        rospy.sleep(1) # make sure have data first from subscribers?
+        self.publish_joint_commands()
+        #self.publish_joint_command()
       
     def joint_1_cb(self, msg):
         """ Callback for joint 1 """
-        self.commands[0] = msg
+        self.commands[0] = msg.data
         
     def joint_2_cb(self, msg):
         """ Callback for joint 2 """
-        self.commands[1] = msg
+        self.commands[1] = msg.data
         
     def joint_3_cb(self, msg):
         """ Callback for joint 1 """
-        self.commands[2] = msg
+        self.commands[2] = msg.data
         
     def joint_4_cb(self, msg):
         """ Callback for joint 1 """
-        self.commands[3] = msg
+        self.commands[3] = msg.data
         
     def joint_5_cb(self, msg):
         """ Callback for joint 1 """
-        self.commands[4] = msg
+        self.commands[4] = msg.data
         
     def gripper_joint_cb(self, msg):
         """ Callback for joint 1 """
-        self.commands[5] = msg
+        self.commands[5] = msg.data
         
-    def publish_joint_commands(self, ws):
+    def publish_joint_commands(self):
         """Retrieve and publish the current state of the arm."""
         
         while not rospy.is_shutdown():
             
             # Publish the commands
-            if rospy.Time.now() > self.r_next:
-                for i in range(0,len(ws)):
-                    ws[i].send(self.commands[i])
-    
+            #if rospy.Time.now() > self.r_next:
+            for i in range(0,len(self.ws)):
+                self.ws[i].send(self.commands[i])
+            rospy.sleep(0.01)
+        
     def cleanup(self):
         """
         Things to do when shutdown occurs.

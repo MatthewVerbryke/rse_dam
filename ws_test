@@ -8,7 +8,7 @@ file_dir = sys.path[0]
 sys.path.append(file_dir + '/..')
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 from rss_git_lite.common import rosConnectWrapper as rC
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float64
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from moveit_msgs.msg import RobotTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
@@ -111,11 +111,16 @@ if __name__ == "__main__":
         test_js.velocity = [2.0, 3.0, 4.0]
         test_js.effort = [0.0, 0.0, 0.0]
         
-        ws = rC.RosMsg('ws4py', connection, 'pub', '/js_test', 'sensor_msgs/JointState', compack.pack_jointstate)
+        test_float = 0.0
+        
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/float64_test', 'std_msgs/Float64', compack.pack_float64)
         while (1):
-            ws.send(test_js)
-            time.sleep(0.5)
-            print("msg sent!")
+            print test_float
+            ws.send(test_float)
+	        test_float = test_float+1.0
+            time.sleep(0.01)
+            
+            #print("msg sent!")
 
         ws.close()
         
