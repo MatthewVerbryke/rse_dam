@@ -27,6 +27,13 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 
 from reachability import is_pose_reachable
 
+# retrive files nessecary for websocket comms
+file_dir = sys.path[0]
+sys.path.append(file_dir + '/../..')
+from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
+from rss_git_lite.common import rosConnectWrapper as rC
+from rse_dam.communication import *
+
 
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
@@ -34,6 +41,10 @@ GRIPPER_GROUP = "widowx_gripper"
 REF_FRAME = "origin_point"
 LAUNCH_RVIZ = False
 JOINT_NAMES = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
+SIDE = "left"
+PUBS = []
+SUBS = []
+CONNECTION = "ws://192.168.0.51:9090/"
 
 
 class RSEMoveItInterface(object):
@@ -54,6 +65,10 @@ class RSEMoveItInterface(object):
         gripper_group = GRIPPER_GROUP
         self.ref_frame = REF_FRAME
         self.joint_names = JOINT_NAMES
+        self.side = SIDE
+        pub_topics = PUBS
+        sub_topics = SUBS
+        self.connection = CONNECTION
         
         # Initialize moveit_commander
         moveit_commander.roscpp_initialize(sys.argv)
@@ -100,6 +115,54 @@ class RSEMoveItInterface(object):
         self.fk_srv.wait_for_service()
         rospy.loginfo("FK service initialized")
         
+        # Initialize communications
+        #self.initialize_comms(pub_topics, sub_topics)
+        #rospy.loginfo("Communcation interfaces setup")
+        
+        # Run main loop
+        #self.main()
+        
+    def intitialize_comms(self, pub_topics, sub_topics):
+        """
+        Intialize communications for the MoveIt interface.
+        
+        TODO: TEST
+        """
+        
+        self.pub_list = []
+        self.rb_pub_list = []
+        self.sub_list = []
+        
+        # Setup local rospy publishers and inter-computer rosbridge publishers
+        for topic in pub_topics:
+            topic_name = topic.topic_name
+            message_type = topic.message_type
+            queue_size = topic.queue_size
+            rate = topic.rate
+            packer = topic.packer
+            if (self.side=="left"):
+                hold_pub = rospy.Publisher(topic_name, message_type, queue_size, rate)
+                self.pub_list.append(hold_pub)
+            elif (self.side=="right"):
+                hold_rb_pub = rC.RosMsg("ws4py", self.connection, "pub", topic_name, message_type, packer)
+                self.rb_pub_list.append(hold_rb_pub)
+        
+        # Setup rospy subscribers
+        for topic in sub_topics:
+            topic_name = topic.topic_name
+            meassage_type = topic.message_type
+            callback_fn = topic.callback_fn
+            hold_sub = rospy.Subscriber(topic_name, message_type, callback_fn)
+            self.sub_list.append(hold_sub)
+        
+    def main(self):
+        """
+        TODO
+        """
+        
+        while not rospy.is_shutdown():
+            pass
+    
     def plan_to_target(self, goal):
         """
         Condensed planning function for all allowed target types. Still 
@@ -374,4 +437,11 @@ class RSEMoveItInterface(object):
         # Exit MoveIt
         moveit_commander.os._exit(0)
         rospy.sleep(1)
+
+
+if __name__ == "__main__":
+    try:
+        RSEMoveItInterface()
+    except rospy.ROSInterruptException:
+        pass
 
