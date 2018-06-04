@@ -1,0 +1,12 @@
+<!--
+Copyright 2017 by University of Cincinnati
+Copyright 2014-2016 by California Institute of Technology
+All rights reserved. See LICENSE file at:
+https://github.com/cmcghan/rss_git_lite
+-->
+
+<launch>
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" > 
+     <arg name="port" value="9090"/>
+  </include>
+</launch>
