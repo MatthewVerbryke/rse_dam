@@ -54,3 +54,11 @@ class DualArmMediator(object):
         # Log shutdown
         rospy.loginfo("Shutting down node 'dual_arm_mediator'")
         rospy.sleep(1)
+
+
+if __name__ == "__main__":
+    try:
+        DualArmMediator()
+    except rospy.ROSInterruptException:
+        pass
+

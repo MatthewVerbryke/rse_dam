@@ -149,11 +149,6 @@ class RobotTrajectoryAdapter(object):
             
             # Store results
             pose_list[i] = pose_i
-            
-            # Create pose from the pose output
-            #pose_out_i = Pose()
-            #pose_out_i.position = pose_i.position
-            #pose_out_i.orientation = pose_i.orientation
         
         # Store final arrays in PoseArray's
         poses.poses = pose_list
@@ -214,3 +209,11 @@ class RobotTrajectoryAdapter(object):
         # Log shutdown
         rospy.loginfo("Shutting down node 'dual_arm_trajectory_adapter'")
         rospy.sleep(1)
+
+
+if __name__ == "__main__":
+    try:
+        RobotTrajectoryAdapter()
+    except rospy.ROSInterruptExecution:
+        pass
+

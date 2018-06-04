@@ -10,8 +10,6 @@
   Additional copyright may be held by others, as reflected in the commit history.
 
   TODO: improve documentation across the board
-  
-  TODO: TEST THIS
 """
 
 import sys 
@@ -69,9 +67,8 @@ class JointCommandsPublisher():
             self.ws.append(rC.RosMsg("ws4py", self.connection, "pub", topic, "std_msgs/Float64", pack_float64))
         
         # Run publishers
-        rospy.sleep(1) # make sure have data first from subscribers?
+        rospy.sleep(1)
         self.publish_joint_commands()
-        #self.publish_joint_command()
       
     def joint_1_cb(self, msg):
         """ Callback for joint 1 """

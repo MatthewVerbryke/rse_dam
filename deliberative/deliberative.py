@@ -60,10 +60,11 @@ class DeliberativeModule(object):
         """
         
         """
-        
-        
+
+
 if __name__ == "__main__":
     try:
         DeliberativeModule()
     except rospy.ROSInterruptException:
         pass
+

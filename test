@@ -263,9 +263,10 @@ def ik_traj_test():
     #print(interface.trajectory)
     
     interface.execute_trajectory()#; exit()
-    
-    speed = 0.05 #m/s
-    obj_trajectory, timestamps = create_simple_move_trajectory(start_pose, goal_pose, speed, "base_link")
+    start_real = interface.get_current_eef_pose()
+    start_pose_real = start_real.pose
+    speed = 0.01 #m/s
+    obj_trajectory, timestamps = create_simple_move_trajectory(start_pose_real, goal_pose, speed, "base_link")
     
     interface.get_trajectory_from_eef_poses(obj_trajectory, str(timestamps))
     #print(interface.trajectory)#; exit()

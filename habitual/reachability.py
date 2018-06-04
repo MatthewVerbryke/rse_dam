@@ -63,3 +63,4 @@ def is_pose_reachable(pose):
     else:
         rospy.logerr("End effector pose is not reachable.")
         return False
+
