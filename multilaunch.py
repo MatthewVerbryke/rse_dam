@@ -20,8 +20,7 @@ from time import sleep
 
 # include the workspace source directory
 sys.path.append(os.getcwd() + "/..") 
-
-import fileFunctions as fF
+from rss_git_lite.common import fileFunctions as fF
 
 
 def printInstructionsToScreen(runScriptType):
@@ -41,12 +40,12 @@ if __name__ == "__main__":
 
         # Get file argument values
         argvdefaults = ["Friday2",
-                        "sim",
+                        "gazebo",
                         "empty_world.launch",
                         "moveit.py",
                         "pseudoDL_v3.0.py"] # default connection valid because starting rosbridge from this file :)
         [computer_name,
-         sim_or_real,
+         simulated,
          gazebo_world,
          HL_call,
          DL_call] = fF.readArgvpieces(sys.argv,argvdefaults)
@@ -56,7 +55,7 @@ if __name__ == "__main__":
         simType = "gazebo"
         some_flag = 1
         
-        # Deliberative module parameters
+        # Deliberative module parameters TODO
         DLsolverUse = "None"
         DLplannerstr = "None"
         
@@ -68,7 +67,7 @@ if __name__ == "__main__":
         joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
         
         # Determine parameters dependent on computer
-        if (computer_name == "Friday2"):
+        if (computer_name=="Friday2"):
             print ("This is the main simulation computer.")
             left_arm = True
             launch_gazebo = True
@@ -76,85 +75,98 @@ if __name__ == "__main__":
             launch_state_pub = True
             launch_arm_command = False
             connection = "ws://192.168.0.50:9090/"
-        elif (computer_name == "cameronhurd"):
-            print ("This is the secondary computer.")\
+        elif (computer_name=="cameronhurd"):
+            print ("This is the secondary computer.")
             left_arm = False
             launch_gazebo = False
             launch_DL = False
             launch_state_pub = False
             launch_arm_command = True
             connection = "ws://192.168.0.51:9090/"
-            
-        # Determine parameters dependent on whether we are running a sim or not
-        # currently, while running this file it is assumed we are running the real thing
-        # or running in gazebo
-        if (sim_or_real == "sim"):
+        
+        # Determine if we are running a Gazebo simulation, running on actual
+        # hardware, or only using fake drivers in RViz. If Gazebo is running,
+        # sim is false due to it interfacing similar to actual hardware.
+        if (simulated=="true"): #<--RViz only
             sim = True
-        else:
+        elif (gazebo_world=="real"): #<--actual hardware
+            sim = False
+            launch_gazebo = False
+        else:  #<-- Gazebo simulation
             sim = False
                   
         # run catkin_make FIRST in the original terminal window and wait
         # 'til it's complete before doing any else! (otherwise you'll get
         # weird ROS ID error messages from the roscore and rosbridge_server
         # if the messages were changed/updated but not recompiled)
-        command = ['bash', '-c', '''
-                        cd %(topdir)s
-                        source devel/setup.bash && catkin_make
-        ''' % locals()]
+        #command = ['bash', '-c', '''
+                        #cd %(topdir)s
+                        #source devel/setup.bash && catkin_make
+        #''' % locals()]
             
-        subprocess.call(command) # each call originates from original directory
+        #subprocess.call(command) # each call originates from original directory
                                  # so "cd" here is "ignored" further down :)
                                  
-        
-        print(" ")
-        print(" ")
-        print(" ")
+        print("")
         
         # TODO: print instructions to screen
         
         tabtitle = []
         command = []
         
+        # If we are in sim, prepare Gazebo
+        if launch_gazebo:
+            tabtitle.extend(["gazebo"])
+            command.extend([''' source %(topdir)s/devel/setup.bash
+                                roslaunch boxbot_gazebo %(gazebo_world)s
+            ''' % locals()])
+            
+            terminal = ['gnome-terminal']
+            for i in range(len(command)):
+                terminal = ['gnome-terminal', '--tab', '-e', '''
+                    bash -c '
+                        printf """%s"""
+                        %s
+                        read
+                    '
+                ''' % (command[i],command[i]), '-t', '%s' % (tabtitle[i],)]
+                
+            # Launch Gazebo
+            subprocess.call(terminal)
+            sleep(8)
+            
+            # Reset
+            tabtitle = []
+            command = []
+        
         # Prepare the rosbridge server
         tabtitle.extend(["rosbridge_server (status)"])
         command.extend([''' source %(topdir)s/devel/setup.bash
                             roslaunch rosbridge_server_9090.launch
-        ''' % locals()]
+        ''' % locals()])
         
-        # If we are in sim, prepare Gazebo
-        if (sim_or_real == "sim"):
-            tabtitle.extend(["gazebo"])
-            command.extend([''' source %(topdir)s/devel/setup.bash
-                                roslaunch boxbot_gazebo %(gazebo_world)s
-            ''' % locals()]
-            
         # Setup the Move group and RL scripts (assumes you are running an arbotix controller)
         tabtitle.extend(["movegroup/RL"])
         command.extend([''' source %(topdir)s/devel/setup.bash
-                            roslaunch widowx_arm_bringup boxbot_arms_moveit.launch sim:=%(sim)s gazebo:=%(sim)s left_arm:=%(left_arm)s
+                            roslaunch widowx_arm_bringup boxbot_arms_moveit.launch sim:=%(sim)s gazebo:=%(launch_gazebo)s left_arm:=%(left_arm)s
 
-        ''' % locals()]
+        ''' % locals()])
         
         # Launch all the previous commands in a multitab terminal
-        terminal = ['gnome-terminal']
+        terminal2 = ['gnome-terminal']
         for i in range(len(command)):
-            terminal.extend(['--tab', '-e', '''
+            terminal2.extend(['--tab', '-e', '''
                 bash -c '
                     %s
                     read
                 '
             ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
-    
-        # Launch the DL and HL scripts in a separate terminal TODO
-        terminal.extend(['--tab', '-e', '''
-            bash -c '
-                ./DLHL_launch.py %(echo_input)d "%(Estcall)s" "%(RLcall)s" "%(HLcall)s" "%(DLcall)s" %(connection)s
-                read
-            '
-        ''' % locals(), '-t', '%s' % ('popout gnome-terminal',)])
+        subprocess.call(terminal2)
+        
+        # TODO: LAUNCH DL AND HL LAYERS
         
         print("All init-scripts have now been called.")
-        
+    
     except KeyboardInterrupt:
         print("KeyboardInterrupt")
         try:
