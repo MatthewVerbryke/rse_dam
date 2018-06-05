@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 """
-  Moveit interface submodule for RSE.
+  Moveit interface node for RSE. Acts as the habitual layer for a robotic
+  arm.
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -30,20 +31,17 @@ from reachability import is_pose_reachable
 # retrive files nessecary for websocket comms
 file_dir = sys.path[0]
 sys.path.append(file_dir + '/../..')
-from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
+from rse_dam.communication import packing
+from rse_dam.rse_dam_msgs.msg import HLtoDL, DLtoHL
 from rss_git_lite.common import rosConnectWrapper as rC
-from rse_dam.communication import *
-
+from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
 GRIPPER_GROUP = "widowx_gripper"
 REF_FRAME = "origin_point"
-LAUNCH_RVIZ = False
 JOINT_NAMES = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
 SIDE = "left"
-PUBS = []
-SUBS = []
 CONNECTION = "ws://192.168.0.51:9090/"
 
 
@@ -60,28 +58,22 @@ class RSEMoveItInterface(object):
         """
         
         # Get the planning group and reference frame
-        # TODO: PASS IN THROUGH PARAM
+        # TODO: PASS IN AS COMMAND LINE PARAMETERS
         self.planning_group = ARM_GROUP
         gripper_group = GRIPPER_GROUP
         self.ref_frame = REF_FRAME
         self.joint_names = JOINT_NAMES
         self.side = SIDE
-        pub_topics = PUBS
-        sub_topics = SUBS
         self.connection = CONNECTION
         
         # Initialize moveit_commander
         moveit_commander.roscpp_initialize(sys.argv)
         
         # Initialize rospy node
-        rospy.init_node("{}_moveit_interface".format(self.planning_group), anonymous=True)
+        rospy.init_node("{}_moveit_interface".format(self.planning_group))
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
-        
-        # Wait for RViz to start up, if we are running it
-        if LAUNCH_RVIZ:
-            rospy.sleep(10)
             
         # Initialize a move group for the main arm planning group
         self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
@@ -116,44 +108,38 @@ class RSEMoveItInterface(object):
         rospy.loginfo("FK service initialized")
         
         # Initialize communications
-        #self.initialize_comms(pub_topics, sub_topics)
+        #self.comms_initialization()
         #rospy.loginfo("Communcation interfaces setup")
         
         # Run main loop
-        #self.main()
+        self.main()
         
-    def intitialize_comms(self, pub_topics, sub_topics):
+    def comms_initialization(self):
         """
         Intialize communications for the MoveIt interface.
         
         TODO: TEST
         """
         
-        self.pub_list = []
-        self.rb_pub_list = []
-        self.sub_list = []
+        # Setup publishers
+        # NOTE: For now, we assume that the left arm movegroup is on the
+        #       same computer as the DL. The right arm movegroup is assumed
+        #       to be on a separate computer, requiring websocket comms.
+        if (self.side=="left"):
+            self.HL_to_DL_pub = rospy.Publisher("/left_habitual/to_dl", HLtoDL, queue_size=1)
+        elif (self.side=="right"):
+            self.HL_to_DL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/right_habitual/to_dl", "HLtoDL", self.pack_HLtoDL)
         
-        # Setup local rospy publishers and inter-computer rosbridge publishers
-        for topic in pub_topics:
-            topic_name = topic.topic_name
-            message_type = topic.message_type
-            queue_size = topic.queue_size
-            rate = topic.rate
-            packer = topic.packer
-            if (self.side=="left"):
-                hold_pub = rospy.Publisher(topic_name, message_type, queue_size, rate)
-                self.pub_list.append(hold_pub)
-            elif (self.side=="right"):
-                hold_rb_pub = rC.RosMsg("ws4py", self.connection, "pub", topic_name, message_type, packer)
-                self.rb_pub_list.append(hold_rb_pub)
+        # Setup subscribers
+        self.DL_to_HL_sub = rospy.Subscriber("/deliberative/to_hl", DLtoHL, self.dl_to_hl_cb)
+
+    def dl_to_hl_cb(self, msg):
+        """
+        Callback for communications with the deliberative layer
         
-        # Setup rospy subscribers
-        for topic in sub_topics:
-            topic_name = topic.topic_name
-            meassage_type = topic.message_type
-            callback_fn = topic.callback_fn
-            hold_sub = rospy.Subscriber(topic_name, message_type, callback_fn)
-            self.sub_list.append(hold_sub)
+        TODO
+        """
+        return msg
         
     def main(self):
         """
