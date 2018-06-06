@@ -1,9 +1,9 @@
 # DL status:
 #  -
-std_msgs/Int16 dl_status
+int16 dl_status
 #
 # Right arm status
-std_msgs/Int16 right_status
+int16 right_status
 #
 # Left arm status
-std_msgs/Int16 left_status
+int16 left_status
