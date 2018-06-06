@@ -151,7 +151,6 @@ if __name__ == "__main__":
         subprocess.call(terminal)
         sleep(8)
         
-        
         #== TERMINAL 2 =================================================
         
         tabtitle = []
@@ -179,7 +178,7 @@ if __name__ == "__main__":
         ''' % locals()])
         
             # Wait for the state publisher on the left computer start first
-            raw_input("Wait for the right arm state publisher to launch, then press enter...")
+            sleep(2)
         
         # Ready the new terminal
         terminal2 = ['gnome-terminal']

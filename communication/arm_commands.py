@@ -43,13 +43,13 @@ class JointCommandsPublisher():
         self.joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "gripper_joint"]
         self.commands = [None]*6
         
-        if left_arm:
+        if (left_arm=="True"):
             self.arm = "left"
-        else:
+        elif (left_arm=="False"):
             self.arm = "right"
-        
+            
         # Initialize node
-        rospy.init_node("{}_state_publisher".format(self.robot))
+        rospy.init_node("arm_command_publisher")
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
@@ -63,7 +63,7 @@ class JointCommandsPublisher():
         self.ws = []
         self.subs = []
         
-        callbacks = [self.joint_1_cb,self.joint_2_cb,self.joint_3_cb,self.joint_4_cb,self.joint_5_cb,self.gripper_joint_cb]
+        callbacks = [self.joint_1_cb, self.joint_2_cb, self.joint_3_cb, self.joint_4_cb, self.joint_5_cb,self.gripper_joint_cb]
         
         # Setup ROSbridge publishers and ROSsubscribers
         for i in range(0,len(self.joint_names)):
@@ -72,7 +72,8 @@ class JointCommandsPublisher():
             self.ws.append(rC.RosMsg("ws4py", self.connection, "pub", topic, "std_msgs/Float64", pack_float64))
         
         # Run publishers
-        rospy.sleep(1)
+        rospy.sleep(5)
+        rospy.loginfo("Joint command publisher initialized")
         self.publish_joint_commands()
       
     def joint_1_cb(self, msg):
