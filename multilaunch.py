@@ -2,6 +2,7 @@
 
 """
   A script to run various other specified scripts and open them together.
+  WIP
   
   Modified from:
   https://github.com/cmcghan/rss_git_lite/blob/master/multiopen_old_combined.py
@@ -51,8 +52,8 @@ if __name__ == "__main__":
          DL_call] = fF.readArgvpieces(sys.argv,argvdefaults)
          
         # General parameters (no alternatives ATM)
-        robotType = "boxbot"
-        simType = "gazebo"
+        robot_type = "boxbot"
+        sim_type = "gazebo"
         some_flag = 1
         
         # Deliberative module parameters TODO
@@ -89,11 +90,19 @@ if __name__ == "__main__":
         # sim is false due to it interfacing similar to actual hardware.
         if (simulated=="true"): #<--RViz only
             sim = True
+            launch_gazebo = False
+            launch_state_pub = False
+            gazebo_running = False
+            launch_arm_command = False
         elif (gazebo_world=="real"): #<--actual hardware
             sim = False
             launch_gazebo = False
+            gazebo_running = False
+            launch_state_pub = False
+            launch_arm_command = False
         else:  #<-- Gazebo simulation
             sim = False
+            gazebo_running = True
                   
         # run catkin_make FIRST in the original terminal window and wait
         # 'til it's complete before doing any else! (otherwise you'll get
@@ -106,38 +115,22 @@ if __name__ == "__main__":
             
         #subprocess.call(command) # each call originates from original directory
                                  # so "cd" here is "ignored" further down :)
-                                 
-        print("")
         
         # TODO: print instructions to screen
+        
+        #== TERMINAL 1 =================================================
         
         tabtitle = []
         command = []
         
-        # If we are in sim, prepare Gazebo
+        # If we are using Gazebo, prepare needed script(s)
         if launch_gazebo:
+            
+            # Gazebo
             tabtitle.extend(["gazebo"])
             command.extend([''' source %(topdir)s/devel/setup.bash
                                 roslaunch boxbot_gazebo %(gazebo_world)s
             ''' % locals()])
-            
-            terminal = ['gnome-terminal']
-            for i in range(len(command)):
-                terminal = ['gnome-terminal', '--tab', '-e', '''
-                    bash -c '
-                        printf """%s"""
-                        %s
-                        read
-                    '
-                ''' % (command[i],command[i]), '-t', '%s' % (tabtitle[i],)]
-                
-            # Launch Gazebo
-            subprocess.call(terminal)
-            sleep(8)
-            
-            # Reset
-            tabtitle = []
-            command = []
         
         # Prepare the rosbridge server
         tabtitle.extend(["rosbridge_server (status)"])
@@ -145,14 +138,50 @@ if __name__ == "__main__":
                             roslaunch rosbridge_server_9090.launch
         ''' % locals()])
         
+        terminal = ['gnome-terminal']
+        for i in range(len(command)):
+            terminal.extend(['--tab', '-e', '''
+                bash -c '
+                    %s
+                    read
+                '
+            ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
+                
+        # Launch rosbridge server and (maybe) Gazebo
+        subprocess.call(terminal)
+        sleep(8)
+        
+        
+        #== TERMINAL 2 =================================================
+        
+        tabtitle = []
+        command = []
+        
         # Setup the Move group and RL scripts (assumes you are running an arbotix controller)
         tabtitle.extend(["movegroup/RL"])
         command.extend([''' source %(topdir)s/devel/setup.bash
-                            roslaunch widowx_arm_bringup boxbot_arms_moveit.launch sim:=%(sim)s gazebo:=%(launch_gazebo)s left_arm:=%(left_arm)s
+                            roslaunch widowx_arm_bringup boxbot_arms_moveit.launch sim:=%(sim)s gazebo:=%(gazebo_running)s left_arm:=%(left_arm)s
 
         ''' % locals()])
         
-        # Launch all the previous commands in a multitab terminal
+        # Arm state publisher
+        if launch_state_pub:
+            tabtitle.extend(["arm-state"])
+            command.extend([''' cd communication
+                                python arm_state.py %(connection)s %(left_arm)s %(robot_type)s
+        ''' % locals()])
+            
+        # Arm command
+        if launch_arm_command:
+            tabtitle.extend(["arm-command"])
+            command.extend([''' cd communication
+                                python arm_commands.py %(connection)s %(left_arm)s %(robot_type)s
+        ''' % locals()])
+        
+            # Wait for the state publisher on the left computer start first
+            raw_input("Wait for the right arm state publisher to launch, then press enter...")
+        
+        # Ready the new terminal
         terminal2 = ['gnome-terminal']
         for i in range(len(command)):
             terminal2.extend(['--tab', '-e', '''
@@ -161,7 +190,14 @@ if __name__ == "__main__":
                     read
                 '
             ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
+            
+        # Launch all the previous commands in a multitab terminal
         subprocess.call(terminal2)
+        
+        #== TERMINAL 3 =================================================
+
+        tabtitle = []
+        command = []
         
         # TODO: LAUNCH DL AND HL LAYERS
         
@@ -175,3 +211,4 @@ if __name__ == "__main__":
             print("NameError")
 
         sleep(3)
+

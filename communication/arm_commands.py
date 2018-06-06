@@ -37,14 +37,19 @@ class JointCommandsPublisher():
     def __init__(self):
     
         # Get Inputs
-        self.connection = CONNECTION
-        self.arm = ARM
-        self.robot = ROBOT
+        self.connection = sys.argv[1]
+        left_arm = sys.argv[2]
+        self.robot = sys.argv[3]
         self.joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "gripper_joint"]
         self.commands = [None]*6
         
+        if left_arm:
+            self.arm = "left"
+        else:
+            self.arm = "right"
+        
         # Initialize node
-        rospy.init_node("{}_state_publisher".format(self.robot), anonymous=True)
+        rospy.init_node("{}_state_publisher".format(self.robot))
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)

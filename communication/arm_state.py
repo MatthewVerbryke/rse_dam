@@ -32,8 +32,6 @@ from rss_git_lite.common import rosConnectWrapper as rC
 ROBOT = "boxbot"
 CONNECTION = "ws://192.168.0.51:9090/" #<--change!
 ARM = "right"
-JOINTS = ["right_joint_1", "right_joint_2", "right_joint_3", "right_joint_4", "right_joint_5", "right_gripper_joint"]
-
 
 class ArmStatePublisher():
     """  """
@@ -41,10 +39,15 @@ class ArmStatePublisher():
     def __init__(self):
         
         # Get inputs
-        self.connection = CONNECTION
-        self.arm = ARM
-        self.joint_names = JOINTS
-        self.robot = ROBOT
+        self.connection = sys.argv[1]
+        left_arm = sys.argv[2]
+        self.joint_names = ["right_joint_1", "right_joint_2", "right_joint_3", "right_joint_4", "right_joint_5", "right_gripper_joint"]
+        self.robot = sys.argv[3]
+        
+        if left_arm:
+            self.arm = "left"
+        else:
+            self.arm = "right"
         
         self.header = {}
         self.position = []
@@ -70,6 +73,7 @@ class ArmStatePublisher():
         self.r_next = rospy.Time.now() + self.r_delta
         
         # Run publisher
+        rospy.loginfo("Arm state publisher initialized")
         self.publish_arm_state(ws)
         
     def get_joint_states(self, msg):
@@ -88,7 +92,7 @@ class ArmStatePublisher():
             # Send the states out at the appropriate time
             if rospy.Time.now() > self.r_next:
                 ws.send(self.robot_joint_state)
-                time.sleep(0.01)
+                rospy.sleep(0.01)
 
     def cleanup(self):
         """
