@@ -3,6 +3,8 @@
 import sys
 import time
 import communication.packing as compack
+import communication.rse_packing as rsepack
+from rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
 
 file_dir = sys.path[0]
 sys.path.append(file_dir + '/..')
@@ -113,13 +115,39 @@ if __name__ == "__main__":
         
         test_float = 0.0
         
-        ws = rC.RosMsg('ws4py', connection, 'pub', '/float64_test', 'std_msgs/Float64', compack.pack_float64)
+        dltohl = DLtoHL()
+        dltohl.status = 1
+        dltohl.move_type = 2
+        dltohl.poses = test_parray
+        dltohl.stamps = "jkldjakjsflds"
+        dltohl.target_pose = goal_pose1
+        dltohl.command = 3
+
+        hltodl = HLtoDL()
+        hltodl.status = 1
+        hltodl.state = 2
+        hltodl.trajectory = test_traj
+
+        dltoop = DLtoOp()
+        dltoop.dl_status = 1
+        dltoop.right_status = 2
+        dltoop.left_status = 3
+
+        optodl = OptoDL()
+        optodl.move_type = 1
+        optodl.object_start = goal_pose1
+        optodl.object_goal = goal_pose2
+        optodl.left_grasp_pose = goal_pose2
+        optodl.left_gap = 1.0
+        optodl.right_grasp_pose = goal_pose1
+        optodl.right_gap = 2.0
+        optodl.move_speed = 3.0
+        optodl.lift_height = 4.0
+        
+        ws = rC.RosMsg('ws4py', connection, 'pub', '/test', 'rse_dam_msgs/HLtoDL', rsepack.pack_HL_to_DL)
         while (1):
-            print test_float
-            ws.send(test_float)
-	        test_float = test_float+1.0
+            ws.send(hltodl)
             time.sleep(0.01)
-            
             #print("msg sent!")
 
         ws.close()

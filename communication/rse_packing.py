@@ -18,9 +18,7 @@ from packing import pack_robottrajectory, pack_pose, pack_posearray, pack_string
 
 def pack_HL_to_DL(hltodl):
     """
-    Package "rse_dam_msgs/HL_to_DL" message.
-    
-    TODO: TEST
+    Package "rse_dam_msgs/HLtoDL" message.
     """
     
     # Prepare message info
@@ -37,16 +35,14 @@ def pack_HL_to_DL(hltodl):
     
 def pack_DL_to_HL(dltohl):
     """
-    Package "rse_dam_msgs/DL_to_HL" message.
-    
-    TODO: TEST
+    Package "rse_dam_msgs/DLtoHL" message.
     """
     
     # Prepare message info
     status = dltohl.status
     move_type = dltohl.move_type
     poses = pack_posearray(dltohl.poses)
-    stamps = pack_string(dltohl.stamps)
+    stamps = dltohl.stamps
     target_pose = pack_pose(dltohl.target_pose)
     command = dltohl.command
     
@@ -59,20 +55,4 @@ def pack_DL_to_HL(dltohl):
                   "command": command}
     
     return dltohl_msg
-    
-def pack_Op_to_DL(optodl):
-    """
-    Package "rse_dam_msgs/Op_to_DL" message.
-    
-    TODO
-    """
-    pass
-    
-def pack_DL_to_Op(dltohl):
-    """
-    Package "rse_dam_msgs/DL_to_Op" message.
-    
-    TODO
-    """
-    pass
     
