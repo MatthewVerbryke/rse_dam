@@ -16,6 +16,10 @@ import os
 import sys
 
 import rospy
+import tf
+
+import adapter
+import trajectories
 
 # retrieve files nessecary for websocket comms
 file_dir = sys.path[0]
@@ -71,6 +75,10 @@ class DeliberativeModule(object):
         # Lower layer status setup
         self.left_status = None
         self.right_status = None
+        
+        # Create a transform listener
+        self.listener = tf.TransformListener()
+        rospy.sleep(1.0)        
         
         # Initialize communications for the layer
         self.comms_initialization()
@@ -253,6 +261,39 @@ class DeliberativeModule(object):
         
         """
         pass
+        
+    def get_object_trajectory(self, template):
+        """
+        Based on the selected trajectory plan (user specified?), get a 
+        trajectory that the target object must follow.
+        
+        TODO: TEST
+        """
+        
+        # Create the object trajectory based on the template choice
+        if (template=="simple move"):
+            trajectory, timesteps = create_simple_move_trajectory(self.start_pose, self.goal_pose, self.move_speed, self.ref_frame)
+        elif (template=="pick_and_place"): # NOTE: NOT READY YET
+            trajectory = create_pick_and_place_trajectory(self.start_pose, self.goal_pose, self.move_speed, self.ref_frame)
+        else:
+            rospy.logerr("Trajectory type not found") # change
+        
+        return trajectory, timesteps 
+        
+    def lookup_frame_transform(self, origin_frame, target_frame):       
+        """
+        Get the transform of between two frames using tf.LookupTransform
+        
+        TODO: TEST 
+        """   
+        
+        # Try to get the info on the frames from tf if given a link nam
+        try:
+            trans, rot = self.listener.lookupTransform(target_frame, origin_frame, rospy.Time(0))
+            return [trans, rot]
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logerr("Failed to recieve the transform for {} to {}".format(origin_frame, target_frame)) #change
+            return "error" #change
         
     def execute_plan(self):
         """
