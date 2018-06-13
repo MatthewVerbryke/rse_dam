@@ -18,14 +18,12 @@ import numpy as np
 import tf
 
 
-def compute_eef_offset(self, frame_1, frame_2):
+def compute_eef_offset(frame_1, frame_2):
     """
     Compute the offset (transfromation matrix) from frame_1 to frame_2.
     
     Adapted from:
     https://answers.ros.org/question/229329/what-is-the-right-way-to-inverse-a-transform-in-python/
-    
-    TODO: TEST
     """
         
     frames = [frame_1, frame_2]
@@ -56,12 +54,10 @@ def compute_eef_offset(self, frame_1, frame_2):
 
     return offset
         
-def adapt_arm_poses(self, object_poses, offset):
+def adapt_arm_poses(object_poses, offset):
     """
     Create an array of poses for the arm based on the object pose array,
     using the predetermined offset.
-    
-    TODO: TEST
     """
         
     # Setup resultant PoseArray
@@ -90,7 +86,7 @@ def adapt_arm_poses(self, object_poses, offset):
     
     return poses
         
-def pose_to_frame_matrix(self, pose_in):
+def pose_to_frame_matrix(pose_in):
     """
     Convert a pose into a transformation matrix
     """
@@ -114,7 +110,7 @@ def pose_to_frame_matrix(self, pose_in):
         
     return transformation_matrix
         
-def frame_matrix_to_pose(self, frame_matrix):
+def frame_matrix_to_pose(frame_matrix):
     """
     Convert a transfromation matrix into a pose.
     """

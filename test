@@ -4,23 +4,23 @@
 import ast
 import rospy
 from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 import matplotlib.pyplot as plt
 import tf
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped
 from moveit_msgs.msg import RobotState
 from sensor_msgs.msg import JointState
+from deliberative.deliberative import *
 from deliberative.adapter import *
 from deliberative.trajectories import *
-from habitual.moveit import *
-from habitual.reachability import *
+#from habitual.moveit import *
+#from habitual.reachability import *
 
 
 REF_FRAME = "origin_point"
 
 def offset_test():
-    
-    adapter = RobotTrajectoryAdapter()
     
     start_pose = Pose()
     start_pose.position.x = 0.0
@@ -30,7 +30,7 @@ def offset_test():
     start_pose.orientation.y = 0.0
     start_pose.orientation.z = 0.0
     start_pose.orientation.w = 1.0
-    start_frame = adapter.pose_to_frame_matrix(start_pose)
+    start_frame = pose_to_frame_matrix(start_pose)
     
     goal_pose = Pose()
     goal_pose.position.x = 0.0
@@ -41,11 +41,19 @@ def offset_test():
     goal_pose.orientation.z = 0.0
     goal_pose.orientation.w = 0.707099  
      
-    offset = adapter.compute_eef_offset(start_pose, goal_pose)
+    offset = compute_eef_offset(start_pose, goal_pose)
     
     test = np.dot(start_frame, offset)
-    test_pose = adapter.frame_matrix_to_pose(test)
+    test_pose = frame_matrix_to_pose(test)
     print test_pose
+    
+def tf_lookup_test():
+    
+    deliberative = DeliberativeModule()
+    
+    tf = deliberative.lookup_frame_transform("base_link", "left_wrist_2_link")
+    
+    print tf
     
 def ik_test():
     
@@ -295,14 +303,15 @@ def ik_traj_test2():
     interface.execute_trajectory()
     exit()
 
-        
+
 #offset_test()
+tf_lookup_test()
 #ik_test()
 #ik_serv_test()
 #fk_serv_test()
 #traj_test()
 #frame_to_pose_test()
 #arm_pose_test()
-ik_traj_test()
+#ik_traj_test()
 #ik_traj_test2()
 

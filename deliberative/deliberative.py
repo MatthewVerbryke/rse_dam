@@ -23,7 +23,7 @@ import trajectories
 
 # retrieve files nessecary for websocket comms
 file_dir = sys.path[0]
-sys.path.append(file_dir + '/../..')
+sys.path.append(file_dir + '/..')
 from rse_dam.communication import packing
 from rse_dam.rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
 from rss_git_lite.common import rosConnectWrapper as rC
@@ -60,7 +60,7 @@ class DeliberativeModule(object):
         self.object_position = None
         self.object_goal = None
         self.left_grasp_pose = None
-        self.right_grasp Pose = None
+        self.right_grasp_pose = None
         self.left_gap = 0.0
         self.right_gap = 0.0
         self.move_speed = 0.0
@@ -266,8 +266,6 @@ class DeliberativeModule(object):
         """
         Based on the selected trajectory plan (user specified?), get a 
         trajectory that the target object must follow.
-        
-        TODO: TEST
         """
         
         # Create the object trajectory based on the template choice
@@ -283,8 +281,6 @@ class DeliberativeModule(object):
     def lookup_frame_transform(self, origin_frame, target_frame):       
         """
         Get the transform of between two frames using tf.LookupTransform
-        
-        TODO: TEST 
         """   
         
         # Try to get the info on the frames from tf if given a link nam
