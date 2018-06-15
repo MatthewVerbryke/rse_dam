@@ -23,12 +23,12 @@ def pack_HL_to_DL(hltodl):
     
     # Prepare message info
     status = hltodl.status
-    state = hltodl.status
+    fail_msg = hltodl.fail_msg
     rt_msg = pack_robottrajectory(hltodl.trajectory)
     
     # Package into dict
     hltodl_msg = {"status": status,
-                  "state": state,
+                  "fail_msg": fail_msg,
                   "trajectory": rt_msg}
                   
     return hltodl_msg
@@ -39,7 +39,6 @@ def pack_DL_to_HL(dltohl):
     """
     
     # Prepare message info
-    status = dltohl.status
     move_type = dltohl.move_type
     poses = pack_posearray(dltohl.poses)
     stamps = dltohl.stamps
