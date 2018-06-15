@@ -173,7 +173,6 @@ class DeliberativeModule(object):
         
         # Fill out DL to HL message from input info
         msg = DLtoHL()
-        msg.status = status
         msg.move_type = move_type
         msg.poses = poses
         msg.stamps = stamps
