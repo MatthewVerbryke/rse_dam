@@ -19,14 +19,15 @@ from geometry_msgs.msg import Pose, PoseArray
 import rospy
 import tf
 
-import adapter
-import trajectories
+import adapter as adpt
+import trajectories as traj
 
-# retrieve files nessecary for websocket comms
-file_dir = sys.path[0]
-sys.path.append(file_dir + '/..')
-from rse_dam.communication import packing
-from rse_dam.rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
+# retrieve files nessecary for websocket comms and layer comms
+file_dir = os.getcwd()
+sys.path.append(file_dir + "/..")
+sys.path.append(file_dir + '/../..')
+from communication import packing
+from rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
 from rss_git_lite.common import rosConnectWrapper as rC
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 
@@ -57,7 +58,7 @@ class DeliberativeModule(object):
         
         # Task information setup
         self.move_type = 0
-        self.template = ""
+        self.template = "simple_move"
         self.object_position = None
         self.object_goal = None
         self.left_grasp_pose = None
@@ -71,10 +72,10 @@ class DeliberativeModule(object):
         # Trajectory information setup
         self.stamps = None
         self.obj_traj = None
-        self.left_offset = None
+        self.left_offset = []
         self.left_poses = None
         self.left_traj = None
-        self.right_offset = None
+        self.right_offset = []
         self.right_poses = None
         self.right_traj = None
         
@@ -90,19 +91,25 @@ class DeliberativeModule(object):
         self.comms_initialization()
         rospy.loginfo("Communcation interfaces setup")
         
+        # Run main loop
+        self.main()
+        
     def main(self):
         """
         Main execution loop for the DL module.
         """
         
-        # Run through state machine and comms updates while rospy is running
+        # Run through state machine and comms updates once each loop while rospy is running
         while not rospy.is_shutdown():
-            pass
+            self.run_state_machine()
+            #rospy.sleep(0.01)
+            raw_input("Enter for next state...")
     
     def cleanup(self):
         """
         Things to do when shutdown occurs.
         """
+        
         # Log shutdown
         rospy.loginfo("Shutting down node 'deliberative_module'")
         rospy.sleep(1)
@@ -127,7 +134,7 @@ class DeliberativeModule(object):
         # Setup subscribers
         self.left_HL_to_DL_sub = rospy.Subscriber("/left_habitual/to_dl", HLtoDL, self.left_hl_cb)
         self.right_HL_to_DL_sub = rospy.Subscriber("/right_habitual/to_dl", HLtoDL, sefl.right_hl_cb)
-        self.Op_to_DL_sub = rospy.Subscriber("/Operator/to_dl", OptoDL, self.op_cb)
+        self.Op_to_DL_sub = rospy.Subscriber("/operator/to_dl", OptoDL, self.op_cb)
     
     def left_hl_cb(self, msg):
         """
@@ -164,6 +171,7 @@ class DeliberativeModule(object):
         TODO: TEST
         """
         
+        # Fill out DL to HL message from input info
         msg = DLtoHL()
         msg.status = status
         msg.move_type = move_type
@@ -185,8 +193,6 @@ class DeliberativeModule(object):
     def run_state_machine(self):
         """
         Run through the DL state machine.
-        
-        TODO: TEST
         """
         
         # TODO: CREATE AN INTERRUPT-HANDLER
@@ -194,13 +200,14 @@ class DeliberativeModule(object):
         # MAIN STATE MACHINE
         # Start (not nessecary/remove?)
         if (self.state=="start"): 
-            self.state=="standby"
+            self.state = "standby"
         
         # Wait for the operator to send a new command
         elif (self.state=="standby"): 
             new_task = self.wait_for_command()
             if new_task:
                 self.state = "check commands"
+                self.old_goal = self.object_goal
             else:
                 pass
         
@@ -230,17 +237,17 @@ class DeliberativeModule(object):
             
             # Substate for creating an object trajectory
             if (self.substate=="plan object trajectory"):
-                self.trajectory, self.stamps = self.get_object_trajectory(self.template)
-                if (trajectory!=None) and (stamps!=None):
+                self.obj_traj, self.stamps = self.get_object_trajectory(self.template)
+                if (self.obj_traj!=None) and (self.stamps!=None):
                     self.substate = "get offsets"
                 else:
                     self.substate = "attempt error resolution"
             
             # Substate for getting end-effector offsets
             elif (self.substate=="get offsets"):
-                self.left_offset = compute_eef_offset(self.object_position, self.left_grasp_pose)
-                self.right_offset = compute_eef_offset(self.object_position, self.right_grasp_pose)
-                if (self.left_offset!=None) and (self.right_offset!=None):
+                self.left_offset = adpt.compute_eef_offset(self.object_position, self.left_grasp_pose)
+                self.right_offset = adpt.compute_eef_offset(self.object_position, self.right_grasp_pose)
+                if (self.left_offset!=[]) and (self.right_offset!=[]):
                     self.substate = "plan eef trajectories"
                 else:
                     self.substate = "attempt error resolution"
@@ -249,8 +256,8 @@ class DeliberativeModule(object):
             # trajecories. Also, send them to the HL layer to get joint 
             # trajectories back.
             elif (self.substate=="plan eef trajectories"):
-                self.left_poses = adapt_arm_poses(self.obj_traj, self.left_offset)
-                self.right_poses = adapt_arm_poses(self.obj_traj, self.right_offset)
+                self.left_poses = adpt.adapt_arm_poses(self.obj_traj, self.left_offset)
+                self.right_poses = adpt.adapt_arm_poses(self.obj_traj, self.right_offset)
                 if (self.left_poses!=None) and (self.right_poses!=None):                  
                     self.substate = "plan joint trajectories"
                 else:
@@ -259,8 +266,8 @@ class DeliberativeModule(object):
             # Substate for getting joint trajectories for both arms
             # NOTE: This requires waiting for a response from both HL
             elif (self.substate=="plan joint trajectories"):
-                plans_received, error = self.get_joint_trajectory_plans():
-                if not plans_recieved and not error:
+                plans_received, error = self.get_joint_trajectory_plans()
+                if not plans_received and not error:
                     pass
                 elif plans_received:
                     self.substate = "check trajectories"
@@ -273,7 +280,7 @@ class DeliberativeModule(object):
                 right_traj_ok = self.check_trajectory("right")
                 if left_traj_ok and right_traj_ok:
                     self.state = "execute plan"
-                    self.substate = "send execution plan"
+                    self.substate = "send execution command"
                 else:
                     self.substate = "attempt error resolution"
 
@@ -330,7 +337,7 @@ class DeliberativeModule(object):
             
             # A substate to check that the move succeded
             elif (self.substate=="check completion"):
-                success = self.check_plan_achievement(self)
+                success = self.check_plan_achievement()
                 if success:
                     self.state = "standby"
                     self.substate = ""
@@ -349,7 +356,7 @@ class DeliberativeModule(object):
         """
         
         # check to see if the goal sent by the operator has changed
-        if (self.goal==self.old_goal):
+        if (self.object_goal==self.old_goal):
             return False
         else:
             return True
@@ -362,17 +369,17 @@ class DeliberativeModule(object):
         #TODO
         return True
         
-    def determine_move_type(self):
+    def determine_move_type(self, op_type):
         """
         Determine the type of planning that needs to be performed. In the 
         future, this may be detemined within this function versus just being
         told what to do.
         """
-        if (self.move_type==1):
+        if (op_type==1):
             plan_type = "dual-arm"
-        elif (self.move_type==2):
+        elif (op_type==2):
             plan_type = "left"
-        elif (self.move_type==3):
+        elif (op_type==3):
             plan_type = "right"
         else:
             plan_type = "error"
@@ -381,7 +388,7 @@ class DeliberativeModule(object):
         
     def get_joint_trajectory_plans(self):
         """
-        Send date to the HL and wait until a response is recieved with a 
+        Send data to the HL and wait until a response is received with a 
         joint trajectory for each arm
         """
         
@@ -420,9 +427,9 @@ class DeliberativeModule(object):
         
         # Create the object trajectory based on the template choice
         if (template=="simple_move"):
-            trajectory, timesteps = create_simple_move_trajectory(self.start_pose, self.goal_pose, self.move_speed, self.ref_frame)
+            trajectory, timesteps = traj.create_simple_move_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
         elif (template=="pick_and_place"): # NOTE: NOT READY YET
-            trajectory = create_pick_and_place_trajectory(self.start_pose, self.goal_pose, self.move_speed, self.ref_frame)
+            trajectory, timesteps = traj.create_pick_and_place_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
         else:
             rospy.logerr("Trajectory type not found") # change
             trajectory = None
@@ -453,7 +460,8 @@ class DeliberativeModule(object):
         
     def execute_plan(self):
         """
-        
+        Execute the generated plan by sending a messege to the HL layers.
+        Wait for a response before ending the publishing of the command.
         """
         # Publish data
         left_msg = self.create_DLtoHL(self.status, 1, PoseArray(), "", Pose(), 1)
