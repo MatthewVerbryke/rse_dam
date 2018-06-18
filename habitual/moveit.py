@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
 """
-  Moveit interface node for RSE. Acts as the habitual layer for a robotic
-  arm.
+  Moveit-based habitual layer module for one robotic arm in a dual-arm 
+  robot.
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: improve documentation across the board
+  TODO: IMPROVE DOCUMENTATION
 """
 
 
@@ -26,7 +26,7 @@ from sensor_msgs.msg import JointState
 import rospy
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from reachability import is_pose_reachable
+import reachability as rech
 
 # retrive files nessecary for websocket comms
 file_dir = sys.path[0]
@@ -45,53 +45,62 @@ SIDE = "left"
 CONNECTION = "ws://192.168.0.51:9090/"
 
 
-class RSEMoveItInterface(object):
+class MoveItHabitualModule(object):
     """
-    A class to interface the MoveIt! motion planning framework with the 
-    RSE habitual layer.
+    RSE habitual layer for a dual-armed robot, using a MoveIt interface.
     """
     
     def __init__(self):
         """
-        Initialize the move group interface for the selected planning 
-        group.
+        Initialize the the HL module with a move group interface for the
+        selected planning group.
         """
-        
-        # Get the planning group and reference frame
-        # TODO: PASS IN AS COMMAND LINE PARAMETERS
-        self.planning_group = ARM_GROUP
-        gripper_group = GRIPPER_GROUP
-        self.ref_frame = REF_FRAME
-        self.joint_names = JOINT_NAMES
-        self.side = SIDE
-        self.connection = CONNECTION
         
         # Initialize moveit_commander
         moveit_commander.roscpp_initialize(sys.argv)
         
         # Initialize rospy node
-        rospy.init_node("{}_moveit_interface".format(self.planning_group))
+        rospy.init_node("habitual_module")
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
-            
-        # Initialize a move group for the main arm planning group
-        self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
         
-        # Initialize a move group for the gripper planning group
+        # Get command line arguments
+        # TODO: CHANGE TO ARGS
+        self.planning_group = ARM_GROUP
+        self.gripper_group = GRIPPER_GROUP
+        self.ref_frame = REF_FRAME
+        self.joint_names = JOINT_NAMES
+        self.side = SIDE
+        self.connection = CONNECTION      
+               
+        # Initialize a move group for the arm and end effector planning groups
+        self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
         self.gripper = moveit_commander.MoveGroupCommander("{}".format(gripper_group))
         
-        # Get end effector link name
+        # Get/set robot parameters
         self.eef_link = self.arm.get_end_effector_link()
-        
-        # Set the pose target reference frame
         self.target_ref_frame = self.ref_frame
         self.arm.set_pose_reference_frame(self.ref_frame)
         
-        # Initialize a class variable for the most recently produced plan
+        # Module information setup
+        self.state = "start"
+        self.status = 1 #TODO
+        self.fail_info = ""
+               
+        # Task information setup
+        self.new_command = 0
+        self.move_type = 0
+        self.start_pose = None
+        self.goal_pose = None
+        self.executing = False
+        
+        # Trajectory information setup
+        self.stamps = None
+        self.pose_traj = None
         self.trajectory = None
         
-        # Setup planning parameters
+        # Planning information setup
         self.arm.allow_replanning(True)
         self.arm.set_goal_position_tolerance(0.001)
         self.arm.set_goal_orientation_tolerance(0.1)
@@ -108,12 +117,38 @@ class RSEMoveItInterface(object):
         rospy.loginfo("FK service initialized")
         
         # Initialize communications
-        #self.comms_initialization()
-        #rospy.loginfo("Communcation interfaces setup")
+        self.comms_initialization()
+        rospy.loginfo("Communcation interfaces setup")
         
         # Run main loop
         self.main()
         
+    def main(self):
+        """
+        Main execution module for the HL module
+        """
+        
+        while not rospy.is_shutdown():
+            self.run_state_machine()
+            #rospy.sleep(0.01)
+            raw_input("Enter for next state...")
+            
+    def cleanup(self):
+        """
+        Things to do when shutdown occurs.
+        """
+        # Log shutdown
+        rospy.loginfo("Shutting down node '{}_moveit_interface'".format(self.planning_group))
+        
+        # Shut down MoveIt cleanly
+        moveit_commander.roscpp_shutdown()
+        
+        # Exit MoveIt
+        moveit_commander.os._exit(0)
+        rospy.sleep(1)
+
+    #==== Communications ==============================================#
+    
     def comms_initialization(self):
         """
         Intialize communications for the MoveIt interface.
@@ -135,19 +170,122 @@ class RSEMoveItInterface(object):
 
     def dl_to_hl_cb(self, msg):
         """
-        Callback for communications with the deliberative layer
+        Callback for deliberative layer msgs.
         
         TODO
         """
         return msg
         
-    def main(self):
+    def create_HLtoDL(self):
         """
+        Create a 'HLtoDL' message.
+        
         TODO
         """
+        pass
+    
+    #==== State Machine ===============================================#
+    
+    def run_state_machine(self):
+        """
+        Run throught the HL state machine
         
-        while not rospy.is_shutdown():
-            pass
+        TODO: TEST
+        """
+        
+        # TODO: CREATE AN INTERRUPT-HANDLER
+        
+        # MAIN STATE MACHINE
+        # Start
+        if (self.state=="start"):
+            self.state = "standby"
+            
+        # Wait for commands from the DL
+        if (self.state=="standby"):
+            new_command = self.wait_for_command()
+            if new_command:
+                self.state = "check reachability"
+                self.new_command = 0
+        
+        # Check the reachability of the pose(s) given by the DL
+        if (self.state=="check reachability"):
+            goal_reachable = self.check_goal_reachability()
+            if goal_reachable:
+                self.state = self.determine_action()
+            else:
+                self.state = "fail up"
+                
+        # Make a plan for the gripper to close or open
+        # TODO
+        
+        # Make a joint trajectory plan for the arm from given poses and timestamps
+        if (self.state=="assemble plan"):
+            trajectory_assembled = self.get_trajectory_from_eef_poses(self.pose_traj, self.stamps)
+            if trajectory_assembled:
+                self.state = "recieve execution command"
+            else:
+                self.state = "fail up"
+        
+        # Make a joint trajectory plan using MoveIt planning interface
+        # TODO
+        
+        # Send plan to DL and wait to recieve an execution command
+        if (self.state=="recieve execution command"):
+            cmd_recieved, error = self.wait_for_execution()
+            if not cmd_recieved and not error:
+                pass
+            elif cmd_recieved and not error:
+                self.state = "execute plan"
+            else:
+                self.state = "fail up"
+        
+        # Execute the planned trajectory/movement
+        if (self.state=="execute_plan"):
+            if self.executing = False
+                error = self.execute_plan()
+                if not error:
+                    self.state = "standby"
+                else:
+                    self.state = "fail up"
+        
+        # Send message to DL on the nature of the error/failure
+        elif (self.state=="fail up"):
+            self.send_failure_info()
+    
+    #==== Module Behaviors ============================================#
+    
+    def wait_for_command(self):
+        """
+        Wait for the DL to send down a new goal.
+        """
+        
+        # Check the new command flag to see if this is a new command
+        if (self.new_command==0):
+            return False
+        elif (self.new_command==1):
+            return True
+            
+    def check_goal_reachability(self):
+        """
+        Determine if given pose(s) are reachable by the arm.
+        """
+        #TODO
+        pass
+        
+    def determine_action(self):
+        """
+        Determine what type of planning state to transition to base on DL
+        command.
+        """
+        
+        if (self.move_type==0):
+            return "plan gripper move"
+        elif (self.move_type==1):
+            return "assemble plan"
+        elif (self.move_type==2):
+            return "make plan" 
+        else:
+            return "fail up"
     
     def plan_to_target(self, goal):
         """
@@ -285,7 +423,7 @@ class RSEMoveItInterface(object):
         for i in range(0,poses_tot):
 
             # Check reachability
-            reachable = is_pose_reachable(points_array.poses[i])
+            reachable = rech.is_pose_reachable(points_array.poses[i])
             
             # Create PoseStamped for the current Pose (GetPositionIK requires PoseStamped)
             pose_req = PoseStamped()
@@ -299,7 +437,7 @@ class RSEMoveItInterface(object):
             resp = self.ik_solve(pose_req, feed_joint_state)
             if (resp.error_code.val!=1):
                 rospy.logerr("IK solver failed on waypoint {} with error code {}".format(i, resp.error_code.val))
-                return 0
+                return False
             
             # Initialize JointTrajectoryPoint message
             trajectory_point = JointTrajectoryPoint()
@@ -324,7 +462,7 @@ class RSEMoveItInterface(object):
         # Put waypoints into the trajectory
         self.trajectory.joint_trajectory.points = trajectory_points
         
-        return 1
+        return True
         
     def move_gripper(self, gripper_goal):
         """
@@ -340,9 +478,18 @@ class RSEMoveItInterface(object):
         # Wait a second
         rospy.sleep(1)
         
+    def wait_for_execution(self):
+        """
+        Keep sending plan to the deliberative layer until we get a response.
+        """
+        #TODO
+        pass
+        
     def execute_trajectory(self):
         """
         Execute the given trajectory plan.
+        
+        TODO: REWORK
         """
         
         # Execute the generated plan
@@ -409,25 +556,11 @@ class RSEMoveItInterface(object):
             
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
-        
-    def cleanup(self):
-        """
-        Things to do when shutdown occurs.
-        """
-        # Log shutdown
-        rospy.loginfo("Shutting down node '{}_moveit_interface'".format(self.planning_group))
-        
-        # Shut down MoveIt cleanly
-        moveit_commander.roscpp_shutdown()
-        
-        # Exit MoveIt
-        moveit_commander.os._exit(0)
-        rospy.sleep(1)
 
 
 if __name__ == "__main__":
     try:
-        RSEMoveItInterface()
+        MoveItHabitualModule()
     except rospy.ROSInterruptException:
         pass
 
