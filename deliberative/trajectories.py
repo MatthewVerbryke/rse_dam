@@ -41,7 +41,7 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     # Fill out array header
     trajectory = PoseArray()
     trajectory.header.seq = 0
-    trajectory.header.frame_id = 1
+    trajectory.header.frame_id = ""
     
     # Setup loop   
     x_step = (goal_pose.position.x - start_pose.position.x)/traverse_wp_len

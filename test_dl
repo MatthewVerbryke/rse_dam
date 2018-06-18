@@ -5,6 +5,7 @@ import rospy
 
 from geometry_msgs.msg import Pose, PoseArray
 from rse_dam_msgs.msg import HLtoDL, DLtoHL
+import deliberative.trajectories as traj
 
 start_pose = Pose()
 start_pose.position.x = 0.2
@@ -25,13 +26,13 @@ goal_pose.orientation.z = 0.707107
 goal_pose.orientation.w = 0.0
 
 speed = 0.01 #m/s
-obj_trajectory, timestamps = create_simple_move_trajectory(start_pose_real, goal_pose, speed, "origin_point")
+obj_trajectory, timestamps = traj.create_simple_move_trajectory(start_pose, goal_pose, speed, "origin_point")
 
 msg = DLtoHL()
 msg.new_cmd = 1
 msg.move_type = 1
 msg.poses = obj_trajectory
-msg.stamps = timestamps
+msg.stamps = str(timestamps)
 msg.target_pose = Pose()
 msg.command = 0
 

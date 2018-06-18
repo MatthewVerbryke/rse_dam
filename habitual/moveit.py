@@ -30,11 +30,11 @@ import reachability as rech
 
 # retrive files nessecary for websocket comms
 file_dir = sys.path[0]
-sys.path.append(file_dir + '/../..')
-from rse_dam.communication import packing
-from rse_dam.rse_dam_msgs.msg import HLtoDL, DLtoHL
-from rss_git_lite.common import rosConnectWrapper as rC
-from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
+sys.path.append(file_dir + '/..')
+from communication import packing
+from rse_dam_msgs.msg import HLtoDL, DLtoHL
+#from rss_git_lite.common import rosConnectWrapper as rC
+#from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
@@ -48,6 +48,8 @@ CONNECTION = "ws://192.168.0.51:9090/"
 class MoveItHabitualModule(object):
     """
     RSE habitual layer for a dual-armed robot, using a MoveIt interface.
+    
+    TODO: TEST
     """
     
     def __init__(self):
@@ -184,7 +186,7 @@ class MoveItHabitualModule(object):
         self.move_type = msg.move_type
         self.pose_traj = msg.poses
         self.stamps = msg.stamps
-        self.goal_pose = msg.goal_pose
+        self.goal_pose = msg.target_pose
         self.command = msg.command
         
         # Store last response
@@ -223,14 +225,14 @@ class MoveItHabitualModule(object):
             self.state = "standby"
             
         # Wait for commands from the DL
-        if (self.state=="standby"):
+        elif (self.state=="standby"):
             new_command = self.wait_for_command()
             if new_command:
                 self.state = "check reachability"
                 self.new_command = 0
         
         # Check the reachability of the pose(s) given by the DL
-        if (self.state=="check reachability"):
+        elif (self.state=="check reachability"):
             goal_reachable = self.check_goal_reachability()
             if goal_reachable:
                 self.state = self.determine_action()
@@ -241,7 +243,7 @@ class MoveItHabitualModule(object):
         # TODO
         
         # Make a joint trajectory plan for the arm from given poses and timestamps
-        if (self.state=="assemble plan"):
+        elif (self.state=="assemble plan"):
             trajectory_assembled = self.get_trajectory_from_eef_poses(self.pose_traj, self.stamps)
             if trajectory_assembled:
                 self.state = "recieve execution command"
@@ -252,7 +254,7 @@ class MoveItHabitualModule(object):
         # TODO
         
         # Send plan to DL and wait to recieve an execution command
-        if (self.state=="recieve execution command"):
+        elif (self.state=="recieve execution command"):
             cmd_recieved, error = self.wait_for_execution()
             if not cmd_recieved and not error:
                 pass
@@ -262,8 +264,8 @@ class MoveItHabitualModule(object):
                 self.state = "fail up"
         
         # Execute the planned trajectory/movement
-        if (self.state=="execute_plan"):
-            if self.executing = False
+        elif (self.state=="execute plan"):
+            if not self.executing:
                 error = self.execute_plan()
                 if not error:
                     self.state = "standby"
@@ -292,7 +294,7 @@ class MoveItHabitualModule(object):
         Determine if given pose(s) are reachable by the arm.
         """
         #TODO
-        pass
+        return True
         
     def determine_action(self):
         """
@@ -502,7 +504,8 @@ class MoveItHabitualModule(object):
         
     def wait_for_execution(self):
         """
-        Keep sending plan to the deliberative layer until we get a response.
+        Keep sending plan to the deliberative layer until a response is 
+        recieved.
         """
         #TODO
         pass
@@ -521,6 +524,12 @@ class MoveItHabitualModule(object):
         # Wait a second
         rospy.sleep(1)
         
+    def send_failure_info(self):
+        """
+        Send information to the operator on the nature of the failure/error
+        """
+        print self.fail_info
+        
     def get_current_eef_pose(self):
         """
         Get the current pose of the arm eef.
@@ -528,6 +537,8 @@ class MoveItHabitualModule(object):
         pose = self.arm.get_current_pose(self.eef_link)
         
         return pose
+        
+    #==== ROS Services ================================================#
         
     def fk_solve(self, joint_angles, link_names):
         """
