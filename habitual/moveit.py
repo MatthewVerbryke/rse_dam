@@ -87,7 +87,7 @@ class MoveItHabitualModule(object):
         
         # Module information setup
         self.state = "start"
-        self.status = 1 #TODO
+        self.status = 0
         self.fail_info = ""
                
         # Task information setup
@@ -178,7 +178,7 @@ class MoveItHabitualModule(object):
         """
         Callback for deliberative layer msgs.
         
-        TODO
+        TODO: TEST
         """
         
         # Extract and store info from deliberative message
@@ -202,7 +202,7 @@ class MoveItHabitualModule(object):
         # Fill out the HL to DL message from input info
         msg = HLtoDL()
         msg.status = self.status
-        msg.fail_msg = self.fail_msg
+        msg.fail_msg = self.fail_info
         msg.trajectory = self.trajectory
         msg.recieved_msg = self.dl_return
         
@@ -223,6 +223,7 @@ class MoveItHabitualModule(object):
         # Start
         if (self.state=="start"):
             self.state = "standby"
+            self.status = 0
             
         # Wait for commands from the DL
         elif (self.state=="standby"):
@@ -230,6 +231,7 @@ class MoveItHabitualModule(object):
             if new_command:
                 self.state = "check reachability"
                 self.new_command = 0
+                self.status = 1
         
         # Check the reachability of the pose(s) given by the DL
         elif (self.state=="check reachability"):
@@ -238,6 +240,7 @@ class MoveItHabitualModule(object):
                 self.state = self.determine_action()
             else:
                 self.state = "fail up"
+                self.status = 3
                 
         # Make a plan for the gripper to close or open
         # TODO
@@ -247,8 +250,10 @@ class MoveItHabitualModule(object):
             trajectory_assembled = self.get_trajectory_from_eef_poses(self.pose_traj, self.stamps)
             if trajectory_assembled:
                 self.state = "recieve execution command"
+                self.status = 2
             else:
                 self.state = "fail up"
+                self.status = 3
         
         # Make a joint trajectory plan using MoveIt planning interface
         # TODO
@@ -260,8 +265,10 @@ class MoveItHabitualModule(object):
                 pass
             elif cmd_recieved and not error:
                 self.state = "execute plan"
+                self.status = 4
             else:
                 self.state = "fail up"
+                self.status = 5
         
         # Execute the planned trajectory/movement
         elif (self.state=="execute plan"):
@@ -269,8 +276,10 @@ class MoveItHabitualModule(object):
                 error = self.execute_plan()
                 if not error:
                     self.state = "standby"
+                    self.status = 0
                 else:
                     self.state = "fail up"
+                    self.status = 7
         
         # Send message to DL on the nature of the error/failure
         elif (self.state=="fail up"):
@@ -368,13 +377,6 @@ class MoveItHabitualModule(object):
         # Plan the trajectory
         self.trajectory = self.arm.plan()
         
-    def plan_to_cartesian_path(self, waypoints):
-        """
-        Create a trajectory plan for the group from the current pose to 
-        the goal joint angle target.
-        """
-        pass #for now
-        
     def plan_to_named_pose(self, named_pose):
         """
         Create a trajectory plan for the group from the current pose to 
@@ -447,7 +449,7 @@ class MoveItHabitualModule(object):
         for i in range(0,poses_tot):
 
             # Check reachability
-            reachable = rech.is_pose_reachable(points_array.poses[i])
+            #reachable = rech.is_pose_reachable(points_array.poses[i])
             
             # Create PoseStamped for the current Pose (GetPositionIK requires PoseStamped)
             pose_req = PoseStamped()
@@ -491,6 +493,8 @@ class MoveItHabitualModule(object):
     def move_gripper(self, gripper_goal):
         """
         Open or close the gripper to a given joint angle goal.
+        
+        TODO: REWORK
         """
         
         # Set the joint goal for the gripper
