@@ -25,20 +25,25 @@ def pack_HL_to_DL(hltodl):
     status = hltodl.status
     fail_msg = hltodl.fail_msg
     rt_msg = pack_robottrajectory(hltodl.trajectory)
+    copy_msg = pack_DL_to_HL(hltodl.recieved_msg)
     
     # Package into dict
     hltodl_msg = {"status": status,
                   "fail_msg": fail_msg,
-                  "trajectory": rt_msg}
+                  "trajectory": rt_msg
+                  "recieved_msg": copy_msg}
                   
     return hltodl_msg
     
 def pack_DL_to_HL(dltohl):
     """
     Package "rse_dam_msgs/DLtoHL" message.
+    
+    TODO: TEST
     """
     
     # Prepare message info
+    new_cmd = dltohl.new_cmd
     move_type = dltohl.move_type
     poses = pack_posearray(dltohl.poses)
     stamps = dltohl.stamps
@@ -46,7 +51,7 @@ def pack_DL_to_HL(dltohl):
     command = dltohl.command
     
     # Package into dict
-    dltohl_msg = {"status": status,
+    dltohl_msg = {"new_cmd": new_cmd,
                   "move_type": move_type,
                   "poses": poses,
                   "stamps": stamps,

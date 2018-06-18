@@ -1,3 +1,8 @@
+# Is there a new command
+#  - 0 = false
+#  - 1 = true
+int16 new_cmd
+#
 # Type of move that is being performed in relation to the arm
 #  - 0 = gripper move
 #  - 1 = dual-arm

@@ -44,6 +44,9 @@ class DeliberativeModule(object):
         # Initialize rospy node
         rospy.init_node("deliberative_module")
         
+        # Initialize cleanup for this node
+        rospy.on_shutdown(self.cleanup)
+        
         # Get relevent parameters
         # TODO: CHANGE TO ARGS
         self.ref_frame = "world"
@@ -164,7 +167,7 @@ class DeliberativeModule(object):
         self.move_speed = msg.move_speed
         self.lift_height = msg.lift_height
         
-    def create_DLtoHL(self, status, move_type, poses, stamps, target_pose, command):
+    def create_DLtoHL(self, new_cmd, move_type, poses, stamps, target_pose, command):
         """
         Create a 'DLtoHL' message
         
@@ -173,6 +176,7 @@ class DeliberativeModule(object):
         
         # Fill out DL to HL message from input info
         msg = DLtoHL()
+        msg.new_cmd = new_cmd
         msg.move_type = move_type
         msg.poses = poses
         msg.stamps = stamps
@@ -183,9 +187,18 @@ class DeliberativeModule(object):
         
     def create_DLtoOp(self):
         """
-        TODO
+        Create a 'DLtoOp' message
+        
+        TODO: TEST
         """
-        pass
+        
+        # Fill out the DL to OP message from input info 
+        msg = DLtoOP()
+        msg.dl_status = self.status
+        msg.right_status = self.right_return.status
+        msg.left_status = self.left_return.status
+        
+        return msg
     
     #==== State Machine ===============================================#
     

@@ -93,12 +93,16 @@ class MoveItHabitualModule(object):
         self.move_type = 0
         self.start_pose = None
         self.goal_pose = None
+        self.command = None
         self.executing = False
         
         # Trajectory information setup
         self.stamps = None
         self.pose_traj = None
         self.trajectory = None
+        
+        # DL status setup
+        self.dl_return = None
         
         # Planning information setup
         self.arm.allow_replanning(True)
@@ -174,15 +178,33 @@ class MoveItHabitualModule(object):
         
         TODO
         """
-        return msg
+        
+        # Extract and store info from deliberative message
+        self.new_command = msg.new_cmd
+        self.move_type = msg.move_type
+        self.pose_traj = msg.poses
+        self.stamps = msg.stamps
+        self.goal_pose = msg.goal_pose
+        self.command = msg.command
+        
+        # Store last response
+        self.dl_return = msg
         
     def create_HLtoDL(self):
         """
         Create a 'HLtoDL' message.
         
-        TODO
+        TODO: TEST
         """
-        pass
+        
+        # Fill out the HL to DL message from input info
+        msg = HLtoDL()
+        msg.status = self.status
+        msg.fail_msg = self.fail_msg
+        msg.trajectory = self.trajectory
+        msg.recieved_msg = self.dl_return
+        
+        return msg
     
     #==== State Machine ===============================================#
     
