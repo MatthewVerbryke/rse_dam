@@ -78,7 +78,7 @@ class MoveItHabitualModule(object):
                
         # Initialize a move group for the arm and end effector planning groups
         self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
-        self.gripper = moveit_commander.MoveGroupCommander("{}".format(gripper_group))
+        self.gripper = moveit_commander.MoveGroupCommander("{}".format(self.gripper_group))
         
         # Get/set robot parameters
         self.eef_link = self.arm.get_end_effector_link()
@@ -131,7 +131,7 @@ class MoveItHabitualModule(object):
         
     def main(self):
         """
-        Main execution module for the HL module
+        Main execution loop for the HL module
         """
         
         while not rospy.is_shutdown():
@@ -177,8 +177,6 @@ class MoveItHabitualModule(object):
     def dl_to_hl_cb(self, msg):
         """
         Callback for deliberative layer msgs.
-        
-        TODO: TEST
         """
         
         # Extract and store info from deliberative message
@@ -195,8 +193,6 @@ class MoveItHabitualModule(object):
     def create_HLtoDL(self):
         """
         Create a 'HLtoDL' message.
-        
-        TODO: TEST
         """
         
         # Fill out the HL to DL message from input info
@@ -213,8 +209,6 @@ class MoveItHabitualModule(object):
     def run_state_machine(self):
         """
         Run throught the HL state machine
-        
-        TODO: TEST
         """
         
         # TODO: CREATE AN INTERRUPT-HANDLER
@@ -273,7 +267,8 @@ class MoveItHabitualModule(object):
         # Execute the planned trajectory/movement
         elif (self.state=="execute plan"):
             if not self.executing:
-                error = self.execute_plan()
+                error = self.execute_trajectory()
+                print got here
                 if not error:
                     self.state = "standby"
                     self.status = 0
@@ -301,9 +296,27 @@ class MoveItHabitualModule(object):
     def check_goal_reachability(self):
         """
         Determine if given pose(s) are reachable by the arm.
+        
+        TODO: ADD SINGLE ARM AND GRIPPER CHECKS
         """
-        #TODO
-        return True
+        
+        # passing on gripper planning for now 
+        if (self.move_type==0):
+            return True
+        
+        # Check each waypoint in the trajectory to see if it is reachable
+        elif (self.move_type==1):
+            for pose in self.pose_traj.poses:
+                reachable = rech.is_pose_reachable(pose)
+                if reachable:
+                    pass
+                else:
+                    return False # <- somewhat crude, replace?
+            return True
+            
+        # Passing on RRT planning for now
+        elif (self.move_type==2):
+            return True
         
     def determine_action(self):
         """
@@ -447,9 +460,6 @@ class MoveItHabitualModule(object):
         
         # Build an array of JointTrajectoryPoint waypoints
         for i in range(0,poses_tot):
-
-            # Check reachability
-            #reachable = rech.is_pose_reachable(points_array.poses[i])
             
             # Create PoseStamped for the current Pose (GetPositionIK requires PoseStamped)
             pose_req = PoseStamped()
@@ -511,8 +521,25 @@ class MoveItHabitualModule(object):
         Keep sending plan to the deliberative layer until a response is 
         recieved.
         """
-        #TODO
-        pass
+        # Publish info to the DL layer
+        msg = self.create_HLtoDL()
+        if (self.side=="left"):
+            self.HL_to_DL_pub.publish(msg)
+        elif (self.side=="right"):
+            self.HL_to_DL_pub.send(msg)
+            
+        # Listen for confirmation that the execution command has been recieved
+        if (self.command==0):
+            command_recieved = False
+            error = False
+        elif (self.command==1):
+            command_recieved = True
+            error = False
+        else:
+            commandL_recieved = False
+            error = True
+            
+        return command_recieved, error
         
     def execute_trajectory(self):
         """
@@ -527,6 +554,8 @@ class MoveItHabitualModule(object):
                 
         # Wait a second
         rospy.sleep(1)
+        
+        return False
         
     def send_failure_info(self):
         """

@@ -8,8 +8,8 @@ from rse_dam_msgs.msg import HLtoDL, DLtoHL
 import deliberative.trajectories as traj
 
 start_pose = Pose()
-start_pose.position.x = 0.2
-start_pose.position.y = 0.1
+start_pose.position.x = 0.24
+start_pose.position.y = 0.128
 start_pose.position.z = 0.2659
 start_pose.orientation.x = 0.0
 start_pose.orientation.y = -0.707107
@@ -17,7 +17,7 @@ start_pose.orientation.z = 0.707107
 start_pose.orientation.w = 0.0
     
 goal_pose = Pose()
-goal_pose.position.x = 0.2
+goal_pose.position.x = 0.24
 goal_pose.position.y = 0.2
 goal_pose.position.z = 0.2659
 goal_pose.orientation.x = 0.0
@@ -34,7 +34,7 @@ msg.move_type = 1
 msg.poses = obj_trajectory
 msg.stamps = str(timestamps)
 msg.target_pose = Pose()
-msg.command = 0
+msg.command = 1
 
 
 def pubber():
