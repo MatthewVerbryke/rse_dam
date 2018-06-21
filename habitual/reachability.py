@@ -19,16 +19,21 @@ import rospy
 import tf
 
 
-# Reference points
-ref_point_1 = [0, 0.087, 0.2659] # arm_base_link   
-ref_point_2 = [0, 0.152, 0.2659] # shoulder_link
-
-
-def is_pose_reachable(pose):
+def is_pose_reachable(pose, side):
     """
     Determine if the given pose is a reachable pose for the end effector
     of a 5 DOF robot arm similar in kinematic structure to the WidowX arm.
+    
+    TODO: TEST
     """
+    
+    # Determine reference points based on side
+    if (side=="left"):
+        ref_point_1 = [0, 0.027325, 0.26035] # arm_base_link   
+        ref_point_2 = [0, 0.15233, 0.26035] # shoulder_link
+    elif (side=="right"):
+        ref_point_1 = [0, -0.027325, 0.26035] # arm_base_link   
+        ref_point_2 = [0, -0.15233, 0.26035] # shoulder_link
     
     # Format the pose goal
     pose_goal = [pose.position.x, pose.position.y, pose.position.z]
@@ -61,6 +66,6 @@ def is_pose_reachable(pose):
     if (result < 0.000001): # chalk it up to rounding errors
         return True
     else:
-        rospy.logerr("End effector pose is not reachable.")
+        #rospy.logerr("End effector pose is not reachable.")
         return False
 

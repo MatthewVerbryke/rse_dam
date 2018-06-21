@@ -268,7 +268,6 @@ class MoveItHabitualModule(object):
         elif (self.state=="execute plan"):
             if not self.executing:
                 error = self.execute_trajectory()
-                print got here
                 if not error:
                     self.state = "standby"
                     self.status = 0
