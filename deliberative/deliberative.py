@@ -26,7 +26,7 @@ import trajectories as traj
 file_dir = sys.path[0]
 sys.path.append(file_dir + "/..")
 sys.path.append(file_dir + "/../..")
-from communication import packing
+from communication import rse_packing as rpack
 from rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
 from rss_git_lite.common import rosConnectWrapper as rC
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
@@ -48,10 +48,14 @@ class DeliberativeModule(object):
         rospy.on_shutdown(self.cleanup)
         
         # Get relevent parameters
-        # TODO: CHANGE TO ARGS
-        self.ref_frame = "world"
-        self.left_eef_frame = "left_wrist_2_link"
-        self.right_eef_frame = "right_wrist_2_link"
+        self.ref_frame = sys.argv[1]
+        self.left_eef_frame = sys.argv[2]
+        self.right_eef_frame = sys.argv[3]
+        self.connection = sys.argv[4]
+        rospy.loginfo("reference frame: {}".format(self.ref_frame))
+        rospy.loginfo("left end effector: {}".format(self.left_eef_frame))
+        rospy.loginfo("right end effector: {}".format(self.right_eef_frame))
+        rospy.loginfo("secondary computer IP address: {}".format(self.connection))
         
         # Module information setup
         self.state = "start"
@@ -61,7 +65,7 @@ class DeliberativeModule(object):
         
         # Task information setup
         self.move_type = 0
-        self.template = "simple_move"
+        self.template = "simple_move" #TODO: DETERMINE THIS FROM MOVETYPE
         self.object_position = None
         self.object_goal = None
         self.left_grasp_pose = None
@@ -132,12 +136,12 @@ class DeliberativeModule(object):
         #       same computer as the DL. The right arm movegroup is assumed
         #       to be on a separate computer, requiring websocket comms.
         self.DL_to_left_HL_pub = rospy.Publisher("/deliberative/to_hl", DLtoHL, queue_size=1)
-        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "DLtoHL", self.pack_DLtoHL)
+        #self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "DLtoHL", rpack.pack_DLtoHL)
         self.DL_to_Op_pub = rospy.Publisher("/deliberative/to_op", DLtoOp, queue_size=1)
         
         # Setup subscribers
         self.left_HL_to_DL_sub = rospy.Subscriber("/left_habitual/to_dl", HLtoDL, self.left_hl_cb)
-        self.right_HL_to_DL_sub = rospy.Subscriber("/right_habitual/to_dl", HLtoDL, sefl.right_hl_cb)
+        self.right_HL_to_DL_sub = rospy.Subscriber("/right_habitual/to_dl", HLtoDL, self.right_hl_cb)
         self.Op_to_DL_sub = rospy.Subscriber("/operator/to_dl", OptoDL, self.op_cb)
     
     def left_hl_cb(self, msg):
@@ -412,7 +416,7 @@ class DeliberativeModule(object):
         self.DL_to_right_HL_pub.send(right_msg)
         
         # Listen for the response that plans have been returned  
-        if (self.left_return==None): or (self.right_return==None):
+        if (self.left_return==None) or (self.right_return==None):
             plans_returned = False
             error = False
         elif (self.left_return.status==2) and (self.right_return.status==2): 
@@ -516,9 +520,10 @@ class DeliberativeModule(object):
         return finished, error
         
     def reset_module(self):
-                """
+        """
         Reset all the module's parameters to their start values.
         """
+        pass
         
     def send_failure_info(self):
         """

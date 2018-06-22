@@ -32,18 +32,10 @@ import reachability as rech
 file_dir = sys.path[0]
 sys.path.append(file_dir + "/..")
 sys.path.append(file_dir + "/../..")
-from communication import packing
+from communication import rse_packing as rpack
 from rse_dam_msgs.msg import HLtoDL, DLtoHL
 from rss_git_lite.common import rosConnectWrapper as rC
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
-
-#TODO: PASS THESE IN AS ARGUMENTS
-ARM_GROUP = "widowx_arm"
-GRIPPER_GROUP = "widowx_gripper"
-REF_FRAME = "origin_point"
-JOINT_NAMES = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
-SIDE = "left"
-CONNECTION = "ws://192.168.0.51:9090/"
 
 
 class MoveItHabitualModule(object):
@@ -79,14 +71,12 @@ class MoveItHabitualModule(object):
             self.side = "left"
         elif (left_arm=="False"):
             self.side = "right"
-            
         rospy.loginfo("planning group: {}".format(self.planning_group))
         rospy.loginfo("gripper planning group: {}".format(self.gripper_group))
         rospy.loginfo("reference frame: {}".format(self.ref_frame))
         rospy.loginfo("joints: {}".format(self.joint_names))
         rospy.loginfo("side: {}".format(self.side))
-        rospy.loginfo("other computer IP address: {}".format(self.connection))
-        print ""
+        rospy.loginfo("secondary computer IP address: {}".format(self.connection))
                
         # Initialize a move group for the arm and end effector planning groups
         self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
@@ -183,7 +173,7 @@ class MoveItHabitualModule(object):
         if (self.side=="left"):
             self.HL_to_DL_pub = rospy.Publisher("/left_habitual/to_dl", HLtoDL, queue_size=1)
         elif (self.side=="right"):
-            self.HL_to_DL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/right_habitual/to_dl", "HLtoDL", self.pack_HLtoDL)
+            self.HL_to_DL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/right_habitual/to_dl", "HLtoDL", rpack.pack_HLtoDL)
         
         # Setup subscribers
         self.DL_to_HL_sub = rospy.Subscriber("/deliberative/to_hl", DLtoHL, self.dl_to_hl_cb)

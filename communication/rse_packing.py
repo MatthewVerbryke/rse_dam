@@ -30,7 +30,7 @@ def pack_HL_to_DL(hltodl):
     # Package into dict
     hltodl_msg = {"status": status,
                   "fail_msg": fail_msg,
-                  "trajectory": rt_msg
+                  "trajectory": rt_msg,
                   "recieved_msg": copy_msg}
                   
     return hltodl_msg

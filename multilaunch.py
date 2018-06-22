@@ -53,17 +53,17 @@ if __name__ == "__main__":
          
         # General parameters (no alternatives ATM)
         robot_type = "boxbot"
-        sim_type = "gazebo"
-        some_flag = 1
         
-        # Deliberative module parameters TODO
-        DLsolverUse = "None"
-        DLplannerstr = "None"
+        # Gazebo parameters
+        sim_type = "gazebo"
+        sim_ref_frame = "world"
+        left_eef_frame = "left_wrist_2_link"
+        right_eef_frame = "right_wrist_2_link"
         
         # Habitual module parameters (no alternatives ATM)
         arm_group = "widowx_arm"
         gripper_group = "widowx_gripper"
-        ref_frame = "origin_point"
+        HL_ref_frame = "origin_point"
         launch_rviz = True
         joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
         
@@ -90,12 +90,14 @@ if __name__ == "__main__":
         # sim is false due to it interfacing similar to actual hardware.
         if (simulated=="true"): #<--RViz only
             sim = True
+            DL_ref_frame = HL_ref_frame
             launch_gazebo = False
             launch_state_pub = False
             gazebo_running = False
             launch_arm_command = False
         elif (gazebo_world=="real"): #<--actual hardware
             sim = False
+            DL_ref_frame = HL_ref_frame
             launch_gazebo = False
             gazebo_running = False
             launch_state_pub = False
@@ -103,6 +105,7 @@ if __name__ == "__main__":
         else:  #<-- Gazebo simulation
             sim = False
             gazebo_running = True
+            DL_ref_frame = sim_ref_frame
                   
         # run catkin_make FIRST in the original terminal window and wait
         # 'til it's complete before doing any else! (otherwise you'll get
@@ -199,9 +202,10 @@ if __name__ == "__main__":
         tabtitle = []
         command = []
         
+        # Setup the Habitual module/ MoveIt interface
         tabtitle.extend(["habitual"])
         command.extend([''' cd habitual
-                            python %(HL_call)s %(arm_group)s %(gripper_group)s %(ref_frame)s %(left_arm)s %(connection)s
+                            python %(HL_call)s %(arm_group)s %(gripper_group)s %(HL_ref_frame)s %(left_arm)s %(connection)s
         ''' % locals()])
         
         # Ready the new terminal
@@ -215,18 +219,38 @@ if __name__ == "__main__":
             ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
         
         subprocess.call(terminal3)
-        sleep(1)
+        sleep(4)
         
         #== TERMINAL 4 =================================================
         
-        # TODO: LAUNCH DL LAYER
+        tabtitle = []
+        command = []
+        
+        # Setup the deliberative module
+        if launch_DL:
+            tabtitle.extend(["deliberative"])
+            command.extend([''' cd deliberative
+                                python %(DL_call)s %(DL_ref_frame)s %(left_eef_frame)s %(right_eef_frame)s %(connection)s
+            ''' % locals()])
+            
+        # Ready the new terminal
+        terminal4 = ['gnome-terminal']
+        for i in range(len(command)):
+            terminal4.extend(['--tab', '-e', '''
+                bash -c '
+                    %s
+                    read
+                '
+            ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
+        
+        subprocess.call(terminal4)
+        sleep(4)
         
         print("All init-scripts have now been called.")
     
     except KeyboardInterrupt:
-        print("KeyboardInterrupt")
         try:
-            print("Exception occurred, stopping script.")
+            print("Keyboard interrupt command recieved, stopping script.")
         except NameError:
             print("NameError")
 
