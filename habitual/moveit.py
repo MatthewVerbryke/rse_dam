@@ -30,11 +30,12 @@ import reachability as rech
 
 # retrive files nessecary for websocket comms
 file_dir = sys.path[0]
-sys.path.append(file_dir + '/..')
+sys.path.append(file_dir + "/..")
+sys.path.append(file_dir + "/../..")
 from communication import packing
 from rse_dam_msgs.msg import HLtoDL, DLtoHL
-#from rss_git_lite.common import rosConnectWrapper as rC
-#from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
+from rss_git_lite.common import rosConnectWrapper as rC
+from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 
 #TODO: PASS THESE IN AS ARGUMENTS
 ARM_GROUP = "widowx_arm"
@@ -68,13 +69,24 @@ class MoveItHabitualModule(object):
         rospy.on_shutdown(self.cleanup)
         
         # Get command line arguments
-        # TODO: CHANGE TO ARGS
-        self.planning_group = ARM_GROUP
-        self.gripper_group = GRIPPER_GROUP
-        self.ref_frame = REF_FRAME
-        self.joint_names = JOINT_NAMES
-        self.side = SIDE
-        self.connection = CONNECTION      
+        self.planning_group = sys.argv[1]
+        self.gripper_group = sys.argv[2]
+        self.ref_frame = sys.argv[3]
+        self.joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"] #<- can't pass in as argument?
+        left_arm = sys.argv[4]
+        self.connection = sys.argv[5]
+        if (left_arm=="True"):
+            self.side = "left"
+        elif (left_arm=="False"):
+            self.side = "right"
+            
+        rospy.loginfo("planning group: {}".format(self.planning_group))
+        rospy.loginfo("gripper planning group: {}".format(self.gripper_group))
+        rospy.loginfo("reference frame: {}".format(self.ref_frame))
+        rospy.loginfo("joints: {}".format(self.joint_names))
+        rospy.loginfo("side: {}".format(self.side))
+        rospy.loginfo("other computer IP address: {}".format(self.connection))
+        print ""
                
         # Initialize a move group for the arm and end effector planning groups
         self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
@@ -267,8 +279,8 @@ class MoveItHabitualModule(object):
         # Execute the planned trajectory/movement
         elif (self.state=="execute plan"):
             if not self.executing:
-                error = self.execute_trajectory()
-                if not error:
+                success = self.execute_trajectory()
+                if success:
                     self.state = "standby"
                     self.status = 0
                 else:
@@ -549,12 +561,12 @@ class MoveItHabitualModule(object):
         
         # Execute the generated plan
         rospy.loginfo("Excuting trajectory...")
-        self.arm.execute(self.trajectory)
-                
+        ret = self.arm.execute(self.trajectory)
+        
         # Wait a second
         rospy.sleep(1)
         
-        return False
+        return ret
         
     def send_failure_info(self):
         """

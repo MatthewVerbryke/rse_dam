@@ -44,7 +44,7 @@ if __name__ == "__main__":
                         "gazebo",
                         "empty_world.launch",
                         "moveit.py",
-                        "pseudoDL_v3.0.py"] # default connection valid because starting rosbridge from this file :)
+                        "deliberative.py"] # default connection valid because starting rosbridge from this file :)
         [computer_name,
          simulated,
          gazebo_world,
@@ -192,13 +192,34 @@ if __name__ == "__main__":
             
         # Launch all the previous commands in a multitab terminal
         subprocess.call(terminal2)
+        sleep(9)
         
         #== TERMINAL 3 =================================================
 
         tabtitle = []
         command = []
         
-        # TODO: LAUNCH DL AND HL LAYERS
+        tabtitle.extend(["habitual"])
+        command.extend([''' cd habitual
+                            python %(HL_call)s %(arm_group)s %(gripper_group)s %(ref_frame)s %(left_arm)s %(connection)s
+        ''' % locals()])
+        
+        # Ready the new terminal
+        terminal3 = ['gnome-terminal']
+        for i in range(len(command)):
+            terminal3.extend(['--tab', '-e', '''
+                bash -c '
+                    %s
+                    read
+                '
+            ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
+        
+        subprocess.call(terminal3)
+        sleep(1)
+        
+        #== TERMINAL 4 =================================================
+        
+        # TODO: LAUNCH DL LAYER
         
         print("All init-scripts have now been called.")
     

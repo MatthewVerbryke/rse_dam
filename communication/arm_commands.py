@@ -42,7 +42,6 @@ class JointCommandsPublisher():
         self.robot = sys.argv[3]
         self.joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "gripper_joint"]
         self.commands = [None]*6
-        
         if (left_arm=="True"):
             self.arm = "left"
         elif (left_arm=="False"):

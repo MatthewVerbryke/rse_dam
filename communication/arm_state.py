@@ -43,10 +43,9 @@ class ArmStatePublisher():
         left_arm = sys.argv[2]
         self.joint_names = ["right_joint_1", "right_joint_2", "right_joint_3", "right_joint_4", "right_joint_5", "right_gripper_joint"]
         self.robot = sys.argv[3]
-        
-        if left_arm:
+        if (left_arm=="True"):
             self.arm = "left"
-        else:
+        elif (left_arm=="False"):
             self.arm = "right"
         
         self.header = {}
