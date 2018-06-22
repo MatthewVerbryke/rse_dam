@@ -11,10 +11,10 @@ import tf
 from geometry_msgs.msg import Pose, PoseStamped
 from moveit_msgs.msg import RobotState
 from sensor_msgs.msg import JointState
-from deliberative.deliberative import *
+#from deliberative.deliberative import *
 from deliberative.adapter import *
 from deliberative.trajectories import *
-#from habitual.moveit import *
+from habitual.test_moveit import *
 #from habitual.reachability import *
 
 
@@ -266,7 +266,7 @@ def ik_traj_test():
     goal_pose.orientation.z = 0.707107
     goal_pose.orientation.w = 0.0
     
-    interface.arm.set_goal_orientation_tolerance(0.005)
+    interface.arm.set_goal_orientation_tolerance(0.01)
     interface.plan_to_pose_goal(start_pose)
     #print(interface.trajectory)
     
@@ -286,11 +286,12 @@ def ik_traj_test2():
     
     #adapter = RobotTrajectoryAdapter()
     
-    interface = RSEMoveItInterface()
-
+    interface = MoveItHabitualModule()
+    
+    interface.arm.set_goal_orientation_tolerance(0.01)
     start_pose = Pose()
-    start_pose.position.x = 0.2
-    start_pose.position.y = 0.1
+    start_pose.position.x = 0.24
+    start_pose.position.y = 0.128
     start_pose.position.z = 0.2659
     start_pose.orientation.x = 0.0
     start_pose.orientation.y = -0.707107
@@ -305,7 +306,7 @@ def ik_traj_test2():
 
 
 #offset_test()
-tf_lookup_test()
+#tf_lookup_test()
 #ik_test()
 #ik_serv_test()
 #fk_serv_test()
@@ -313,5 +314,5 @@ tf_lookup_test()
 #frame_to_pose_test()
 #arm_pose_test()
 #ik_traj_test()
-#ik_traj_test2()
+ik_traj_test2()
 

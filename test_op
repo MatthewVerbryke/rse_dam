@@ -8,32 +8,32 @@ from rse_dam_msgs.msg import OptoDL, DLtoOp
 
 
 start_pose = Pose()
-start_pose.position.x = 0.2
-start_pose.position.y = -0.1
-start_pose.position.z = 0.0
+start_pose.position.x = 0.24
+start_pose.position.y = 0.0
+start_pose.position.z = 0.2659
 start_pose.orientation.x = 1.0
 start_pose.orientation.y = 0.0
 start_pose.orientation.z = 0.0
 start_pose.orientation.w = 0.0
 
 goal_pose = Pose()
-goal_pose.position.x = 0.2
-goal_pose.position.y = 0.1
-goal_pose.position.z = 0.0
+goal_pose.position.x = 0.24
+goal_pose.position.y = 0.075
+goal_pose.position.z = 0.2659
 goal_pose.orientation.x = 1.0
 goal_pose.orientation.y = 0.0
 goal_pose.orientation.z = 0.0
 goal_pose.orientation.w = 0.0
 
 left_grasp_pose = Pose()
-left_grasp_pose.position.x = 0.2
-left_grasp_pose.position.y = 0.0
-left_grasp_pose.position.z = 0.0
-left_grasp_pose.orientation.x = 1.0
-left_grasp_pose.orientation.y = 0.0
-left_grasp_pose.orientation.z = 0.0
+left_grasp_pose.position.x = 0.24
+left_grasp_pose.position.y = 0.128
+left_grasp_pose.position.z = 0.2659
+left_grasp_pose.orientation.x = 0.0
+left_grasp_pose.orientation.y = -0.707107
+left_grasp_pose.orientation.z = 0.707107
 left_grasp_pose.orientation.w = 0.0
-
+    
 right_grasp_pose = Pose()
 right_grasp_pose.position.x = 0.2
 right_grasp_pose.position.y = -0.2
@@ -49,8 +49,8 @@ msg.object_start = start_pose
 msg.object_goal = goal_pose
 msg.left_grasp_pose = left_grasp_pose
 msg.right_grasp_pose = right_grasp_pose
-msg.left_gap = 0.05
-msg.right_gap = 0.05
+msg.left_gap = 0.0
+msg.right_gap = 0.0
 msg.move_speed = 0.01
 msg.lift_height = 0.0
 

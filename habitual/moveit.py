@@ -101,6 +101,7 @@ class MoveItHabitualModule(object):
         self.state = "start"
         self.status = 0
         self.fail_info = ""
+        self.increment = 0
                
         # Task information setup
         self.new_command = 0
@@ -108,7 +109,7 @@ class MoveItHabitualModule(object):
         self.start_pose = None
         self.goal_pose = None
         self.command = None
-        self.executing = False
+        self.executed = False
         
         # Trajectory information setup
         self.stamps = None
@@ -121,7 +122,7 @@ class MoveItHabitualModule(object):
         # Planning information setup
         self.arm.allow_replanning(True)
         self.arm.set_goal_position_tolerance(0.001)
-        self.arm.set_goal_orientation_tolerance(0.1)
+        self.arm.set_goal_orientation_tolerance(0.01)
         rospy.loginfo("MoveIt! interface initialized")
         
         # Setup a connection to the 'compute_ik' service
@@ -147,9 +148,10 @@ class MoveItHabitualModule(object):
         """
         
         while not rospy.is_shutdown():
+            print(self.state)
             self.run_state_machine()
-            #rospy.sleep(0.01)
-            raw_input("Enter for next state...")
+            rospy.sleep(0.01)
+            #raw_input("Enter for next state...")
             
     def cleanup(self):
         """
@@ -233,6 +235,7 @@ class MoveItHabitualModule(object):
             
         # Wait for commands from the DL
         elif (self.state=="standby"):
+            self.status = 0
             new_command = self.wait_for_command()
             if new_command:
                 self.state = "check reachability"
@@ -256,6 +259,7 @@ class MoveItHabitualModule(object):
             trajectory_assembled = self.get_trajectory_from_eef_poses(self.pose_traj, self.stamps)
             if trajectory_assembled:
                 self.state = "recieve execution command"
+                cmd_recieved, error = self.wait_for_execution()
                 self.status = 2
             else:
                 self.state = "fail up"
@@ -278,15 +282,30 @@ class MoveItHabitualModule(object):
         
         # Execute the planned trajectory/movement
         elif (self.state=="execute plan"):
-            if not self.executing:
+            if not self.executed:
                 success = self.execute_trajectory()
+                self.executed = True
                 if success:
-                    self.state = "standby"
-                    self.status = 0
+                    self.status = 6
                 else:
                     self.state = "fail up"
                     self.status = 7
-        
+                    
+            # Let the DL know the HL is done
+            # TODO: A BETTER WAY TO DO THIS?
+            elif self.executed and (self.status==6):
+                self.increment += 1 
+                if (self.increment<=50):
+                    msg = self.create_HLtoDL()
+                    if (self.side=="left"):
+                        self.HL_to_DL_pub.publish(msg)
+                    elif (self.side=="right"):
+                        self.HL_to_DL_pub.send(msg)
+                else:
+                    self.state = "standby"
+                    self.status = 0
+                    self.reset_module()
+
         # Send message to DL on the nature of the error/failure
         elif (self.state=="fail up"):
             self.send_failure_info()
@@ -318,7 +337,7 @@ class MoveItHabitualModule(object):
         # Check each waypoint in the trajectory to see if it is reachable
         elif (self.move_type==1):
             for pose in self.pose_traj.poses:
-                reachable = rech.is_pose_reachable(pose)
+                reachable = rech.is_pose_reachable(pose, self.side)
                 if reachable:
                     pass
                 else:
@@ -331,7 +350,7 @@ class MoveItHabitualModule(object):
         
     def determine_action(self):
         """
-        Determine what type of planning state to transition to base on DL
+        Determine what type of planning state to transition to based on DL
         command.
         """
         
@@ -547,7 +566,7 @@ class MoveItHabitualModule(object):
             command_recieved = True
             error = False
         else:
-            commandL_recieved = False
+            command_recieved = False
             error = True
             
         return command_recieved, error
@@ -559,6 +578,16 @@ class MoveItHabitualModule(object):
         TODO: REWORK
         """
         
+        # Tell the DL the HL is executing
+        i = 0
+        while (i<=10):
+            msg = self.create_HLtoDL()
+            if (self.side=="left"):
+                self.HL_to_DL_pub.publish(msg)
+            elif (self.side=="right"):
+                self.HL_to_DL_pub.send(msg)
+            i += 1
+        
         # Execute the generated plan
         rospy.loginfo("Excuting trajectory...")
         ret = self.arm.execute(self.trajectory)
@@ -567,6 +596,21 @@ class MoveItHabitualModule(object):
         rospy.sleep(1)
         
         return ret
+        
+    def reset_module(self):
+        """
+        Reset all the module's parameters to their start values.
+        """
+        self.increment = 0
+        self.new_command = 0
+        self.move_type = 0
+        self.start_pose = None
+        self.goal_pose = None
+        self.command = None
+        self.executed = False
+        self.stamps = None
+        self.pose_traj = None
+        self.trajectory = None
         
     def send_failure_info(self):
         """

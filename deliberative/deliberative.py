@@ -23,9 +23,9 @@ import adapter as adpt
 import trajectories as traj
 
 # retrieve files nessecary for websocket comms and layer comms
-file_dir = os.getcwd()
+file_dir = sys.path[0]
 sys.path.append(file_dir + "/..")
-sys.path.append(file_dir + '/../..')
+sys.path.append(file_dir + "/../..")
 from communication import packing
 from rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
 from rss_git_lite.common import rosConnectWrapper as rC
@@ -104,9 +104,10 @@ class DeliberativeModule(object):
         
         # Run through state machine and comms updates once each loop while rospy is running
         while not rospy.is_shutdown():
+            print self.state
             self.run_state_machine()
-            #rospy.sleep(0.01)
-            raw_input("Enter for next state...")
+            rospy.sleep(0.01)
+            #raw_input("Enter for next state...")
     
     def cleanup(self):
         """
@@ -179,7 +180,7 @@ class DeliberativeModule(object):
         msg.new_cmd = new_cmd
         msg.move_type = move_type
         msg.poses = poses
-        msg.stamps = stamps
+        msg.stamps = str(stamps)
         msg.target_pose = target_pose
         msg.command = command
         
@@ -405,13 +406,16 @@ class DeliberativeModule(object):
         """
         
         # Publish data
-        left_msg = self.create_DLtoHL(self.status, 1, self.left_poses, self.stamps, Pose(), 0)
-        right_msg = self.create_DLtoHL(self.status, 1, self.right_poses, self.stamps, Pose(), 0)
+        left_msg = self.create_DLtoHL(1, 1, self.left_poses, self.stamps, Pose(), 0)
+        right_msg = self.create_DLtoHL(1, 1, self.right_poses, self.stamps, Pose(), 0)
         self.DL_to_left_HL_pub.publish(left_msg)
         self.DL_to_right_HL_pub.send(right_msg)
         
         # Listen for the response that plans have been returned  
-        if (self.left_return.status==2) and (self.right_return.status==2): 
+        if (self.left_return==None): or (self.right_return==None):
+            plans_returned = False
+            error = False
+        elif (self.left_return.status==2) and (self.right_return.status==2): 
             self.left_traj = self.left_return.trajectory
             self.right_traj = self.right_return.trajectory
             plans_returned = True
@@ -476,11 +480,11 @@ class DeliberativeModule(object):
         Wait for a response before ending the publishing of the command.
         """
         # Publish data
-        left_msg = self.create_DLtoHL(self.status, 1, PoseArray(), "", Pose(), 1)
-        right_msg = self.create_DLtoHL(self.status, 1, PoseArray(), "", Pose(), 1)
+        left_msg = self.create_DLtoHL(0, 1, PoseArray(), "", Pose(), 1)
+        right_msg = self.create_DLtoHL(0, 1, PoseArray(), "", Pose(), 1)
         self.DL_to_left_HL_pub.publish(left_msg)
         self.DL_to_right_HL_pub.send(right_msg)
-                
+        
         # Listen for the response that the plan is being executed
         if (self.left_return.status==4) and (self.right_return.status==4): 
             executing = True
@@ -498,7 +502,7 @@ class DeliberativeModule(object):
         """
         Monitor the execution of the plan.
         """
-        
+        print self.left_return.status
         if (self.left_return.status==6) and (self.right_return.status==6): 
             finished = True
             error = False
@@ -510,13 +514,11 @@ class DeliberativeModule(object):
             error = False
             
         return finished, error
-            
-    def check_plan_achievement(self):
+        
+    def reset_module(self):
+                """
+        Reset all the module's parameters to their start values.
         """
-        Check that the plan has been achieved.
-        """
-        #TODO
-        return True
         
     def send_failure_info(self):
         """
