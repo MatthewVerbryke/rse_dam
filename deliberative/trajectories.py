@@ -16,6 +16,7 @@ import copy
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 import math
 import rospy
+import tf
 
 
 def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
@@ -41,7 +42,7 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     # Fill out array header
     trajectory = PoseArray()
     trajectory.header.seq = 0
-    trajectory.header.frame_id = ""
+    trajectory.header.frame_id = str(ref_frame)
     
     # Setup loop   
     x_step = (goal_pose.position.x - start_pose.position.x)/traverse_wp_len
@@ -75,6 +76,85 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     trajectory.poses = pose_list
     
     return trajectory, timestamps
+    
+def create_in_place_rotation_trajectory(start_pose, goal_pose, ang_rate, ref_frame):
+    """
+    Creates a simple trajectory in which the object is rotated at a given
+    angular rate to a new orientation with no positional change. Assumes 
+    no obstacles are on the path for simplicity.
+    
+    TODO: TEST
+    """
+    
+    timestep = 0.1
+    
+    # Get start and end rotations in euler 'xyz' angles
+    start_angles = tf.transformations.euler_from_quaternion([start_pose.orientation.x,
+                                                            start_pose.orientation.y,
+                                                            start_pose.orientation.z,
+                                                            start_pose.orientation.w])
+    goal_angles = tf.transformations.euler_from_quaternion([goal_pose.orientation.x,
+                                                           goal_pose.orientation.y,
+                                                           goal_pose.orientation.z,
+                                                           goal_pose.orientation.w])
+    
+    #Get the angular distance between the start and goal angles for each stationary axis
+    angle_x = goal_angles[0] - start_angles[0]
+    angle_y = goal_angles[1] - start_angles[1]
+    angle_z = goal_angles[2] - start_angles[2]
+    total_angle = math.sqrt(angle_x**2 + angle_y**2 + angle_z**2)
+    
+    # Calculate the number of waypoints 
+    angle_time = total_angle/ang_rate
+    angle_wp_len = int(math.ceil(angle_time/timestep))
+    
+    # Fill out array header
+    trajectory = PoseArray()
+    trajectory.header.seq = 0
+    trajectory.header.frame_id = str(ref_frame)
+    
+    # Setup loop   
+    ax_step = (goal_angles[0] - start_angles[0])/angle_wp_len
+    ay_step = (goal_angles[1] - start_angles[1])/angle_wp_len
+    az_step = (goal_angles[2] - start_angles[2])/angle_wp_len
+    pose_list = [None]*(angle_wp_len+1)
+    timestamps = []
+    
+    # Fill out poses and timesteps
+    for i in range(0, angle_wp_len):
+    
+        # Get orientation
+        pose_ax_i = start_angles[0] + ax_step*i
+        pose_ay_i = start_angles[1] + ay_step*i
+        pose_az_i = start_angles[2] + az_step*i
+        
+        # Convert representation to quaternion
+        quat_i = tf.transformations.quaternion_from_euler(pose_ax_i, pose_ay_i, pose_az_i)
+        
+        # Put into pose, then pose list
+        pose_i = Pose()
+        pose_i.orientation.x = quat_i[0]
+        pose_i.orientation.y = quat_i[1]
+        pose_i.orientation.z = quat_i[2]
+        pose_i.orientation.w = quat_i[3]
+        pose_i.position = start_pose.position
+        pose_list[i] = pose_i
+        
+        # Get timestamp
+        sec, nsec = get_stamp(i*timestep)
+        timestamps.append({"secs": sec, "nsecs": nsec})
+        
+    # Place the goal point at the end as well
+    temp_pose = copy.deepcopy(goal_pose)
+    pose_list[angle_wp_len] = temp_pose
+    sec, nsec = get_stamp((i+1)*timestep)
+    timestamps.append({"secs": sec, "nsecs": nsec})
+    
+    # Package result
+    trajectory.poses = pose_list
+    
+    return trajectory, timestamps
+        
     
 def create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed, ref_frame):
     """

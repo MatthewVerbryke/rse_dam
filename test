@@ -14,7 +14,7 @@ from sensor_msgs.msg import JointState
 #from deliberative.deliberative import *
 from deliberative.adapter import *
 from deliberative.trajectories import *
-from habitual.test_moveit import *
+#from habitual.test_moveit import *
 #from habitual.reachability import *
 
 
@@ -137,27 +137,28 @@ def fk_serv_test():
 def traj_test():
     
     start_pose = Pose()
-    start_pose.position.x = 0.2
-    start_pose.position.y = -0.1
+    start_pose.position.x = 0.0
+    start_pose.position.y = -0.0
     start_pose.position.z = 0.0
-    start_pose.orientation.x = 1.0
+    start_pose.orientation.x = 0.707107
     start_pose.orientation.y = 0.0
     start_pose.orientation.z = 0.0
-    start_pose.orientation.w = 0.0
+    start_pose.orientation.w = 0.707107
     
     goal_pose = Pose()
-    goal_pose.position.x = 0.2
-    goal_pose.position.y = 0.1
+    goal_pose.position.x = 0.0
+    goal_pose.position.y = 0.0
     goal_pose.position.z = 0.0
-    goal_pose.orientation.x = 1.0
-    goal_pose.orientation.y = 0.0
-    goal_pose.orientation.z = 0.0
+    goal_pose.orientation.x = 0.0
+    goal_pose.orientation.y = -0.707107
+    goal_pose.orientation.z = 0.707107
     goal_pose.orientation.w = 0.0
     
-    speed = 0.05 #m/s
+    speed = 0.05 #rad/s
     lift_height = 0.1
     
-    trajectory, timestamps = create_simple_move_trajectory(start_pose, goal_pose, speed, REF_FRAME)    
+    trajectory, timestamps = create_in_place_rotation_trajectory(start_pose, goal_pose, speed, REF_FRAME)
+    #trajectory, timestamps = create_simple_move_trajectory(start_pose, goal_pose, speed, REF_FRAME)    
     #trajectory = create_pick_and_place_trajectory(start_pose, goal_pose, lift_height, speed)
 
     timestamp_array = ast.literal_eval(str(timestamps))
@@ -293,10 +294,10 @@ def ik_traj_test2():
     start_pose.position.x = 0.24
     start_pose.position.y = 0.128
     start_pose.position.z = 0.2659
-    start_pose.orientation.x = 0.0
-    start_pose.orientation.y = -0.707107
-    start_pose.orientation.z = 0.707107
-    start_pose.orientation.w = 0.0
+    goal_pose.orientation.x = 0.0
+    goal_pose.orientation.y = -0.707107
+    goal_pose.orientation.z = 0.707107
+    goal_pose.orientation.w = 0.0
     
     goal_pose = Pose()
 
@@ -310,9 +311,9 @@ def ik_traj_test2():
 #ik_test()
 #ik_serv_test()
 #fk_serv_test()
-#traj_test()
+traj_test()
 #frame_to_pose_test()
 #arm_pose_test()
 #ik_traj_test()
-ik_traj_test2()
+#ik_traj_test2()
 
