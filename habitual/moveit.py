@@ -141,6 +141,7 @@ class MoveItHabitualModule(object):
         while not rospy.is_shutdown():
             print(self.state)
             self.run_state_machine()
+            self.publish_HLtoDL()
             rospy.sleep(0.01)
             #raw_input("Enter for next state...")
             
@@ -209,6 +210,20 @@ class MoveItHabitualModule(object):
         msg.recieved_msg = self.dl_return
         
         return msg
+        
+    def publish_HLtoDL(self):
+        """
+        Publish a message to the deliberative module.
+        """
+        
+        # Create 'DLtoOP' message
+        msg = self.create_HLtoDL()
+        
+        # Publish it
+        if (self.side=="left"):
+            self.HL_to_DL_pub.publish(msg)
+        elif (self.side=="right"):
+            self.HL_to_DL_pub.send(msg)
     
     #==== State Machine ===============================================#
     
@@ -288,11 +303,7 @@ class MoveItHabitualModule(object):
             elif self.executed and (self.status==6):
                 self.increment += 1 
                 if (self.increment<=50):
-                    msg = self.create_HLtoDL()
-                    if (self.side=="left"):
-                        self.HL_to_DL_pub.publish(msg)
-                    elif (self.side=="right"):
-                        self.HL_to_DL_pub.send(msg)
+                    pass
                 else:
                     self.state = "standby"
                     self.status = 0
@@ -309,13 +320,8 @@ class MoveItHabitualModule(object):
         Wait for the DL to send down a new goal.
         """
         
-        # retreive and publish the arms current eff position
+        # retrieve the current eff position
         self.get_current_eef_pose()
-        msg = self.create_HLtoDL()
-        if (self.side=="left"):
-            self.HL_to_DL_pub.publish(msg)
-        elif (self.side=="right"):
-            self.HL_to_DL_pub.send(msg)
         
         # Check the new command flag to see if this is a new command
         if (self.new_command==0):
@@ -341,6 +347,7 @@ class MoveItHabitualModule(object):
                 if reachable:
                     pass
                 else:
+                    self.fail_info = "At least one of the points in the specified {} trajectory may not be reachable".format(self.side)
                     return False # <- somewhat crude, replace?
             return True
             
@@ -361,6 +368,7 @@ class MoveItHabitualModule(object):
         elif (self.move_type==2):
             return "make plan" 
         else:
+            self.fail_info = "Planning type not recognized"
             return "fail up"
     
     def plan_to_target(self, goal):
@@ -503,6 +511,7 @@ class MoveItHabitualModule(object):
             resp = self.ik_solve(pose_req, feed_joint_state)
             if (resp.error_code.val!=1):
                 rospy.logerr("IK solver failed on waypoint {} with error code {}".format(i, resp.error_code.val))
+                self.fail_info = "IK solver failed on waypoint {} with error code {}".format(i, resp.error_code.val)
                 return False
             
             # Initialize JointTrajectoryPoint message
@@ -551,12 +560,6 @@ class MoveItHabitualModule(object):
         Keep sending plan to the deliberative layer until a response is 
         recieved.
         """
-        # Publish info to the DL layer
-        msg = self.create_HLtoDL()
-        if (self.side=="left"):
-            self.HL_to_DL_pub.publish(msg)
-        elif (self.side=="right"):
-            self.HL_to_DL_pub.send(msg)
             
         # Listen for confirmation that the execution command has been recieved
         if (self.command==0):
@@ -568,6 +571,7 @@ class MoveItHabitualModule(object):
         else:
             command_recieved = False
             error = True
+            self.fail_info = "'command' value not recognized"
             
         return command_recieved, error
         
@@ -578,24 +582,18 @@ class MoveItHabitualModule(object):
         TODO: REWORK
         """
         
-        # Tell the DL the HL is executing
-        i = 0
-        while (i<=10):
-            msg = self.create_HLtoDL()
-            if (self.side=="left"):
-                self.HL_to_DL_pub.publish(msg)
-            elif (self.side=="right"):
-                self.HL_to_DL_pub.send(msg)
-            i += 1
-        
         # Execute the generated plan
         rospy.loginfo("Excuting trajectory...")
-        ret = self.arm.execute(self.trajectory)
+        success = self.arm.execute(self.trajectory)
         
         # Wait a second
         rospy.sleep(1)
         
-        return ret
+        # If it failed tell the Op and DL so
+        if not success:
+            self.fail_info = "Execution of the trajectory plan has failed"
+            
+        return success
         
     def reset_module(self):
         """
@@ -611,12 +609,6 @@ class MoveItHabitualModule(object):
         self.stamps = ""
         self.pose_traj = PoseArray()
         self.trajectory = RobotTrajectory()
-        
-    def send_failure_info(self):
-        """
-        Send information to the operator on the nature of the failure/error
-        """
-        print self.fail_info
         
     def get_current_eef_pose(self):
         """

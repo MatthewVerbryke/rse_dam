@@ -16,6 +16,7 @@ import os
 import sys
 
 from geometry_msgs.msg import Pose, PoseArray
+from moveit_msgs.msg import RobotTrajectory
 import rospy
 import tf
 
@@ -60,35 +61,35 @@ class DeliberativeModule(object):
         # Module information setup
         self.state = "start"
         self.substate = ""
-        self.status = 1 #TODO
+        self.status = 0
         self.fail_info = ""
         
         # Task information setup
         self.move_type = 0
         self.template = "simple_move" #TODO: DETERMINE THIS FROM MOVETYPE
-        self.object_position = None
-        self.object_goal = None
-        self.left_grasp_pose = None
-        self.right_grasp_pose = None
+        self.object_position = Pose()
+        self.object_goal = Pose()
+        self.left_grasp_pose = Pose()
+        self.right_grasp_pose = Pose()
         self.left_gap = 0.0
         self.right_gap = 0.0
         self.move_speed = 0.0
         self.lift_height = 0.0
-        self.old_goal = None
+        self.old_goal = Pose()
         
         # Trajectory information setup
         self.stamps = None
         self.obj_traj = None
         self.left_offset = []
         self.left_poses = None
-        self.left_traj = None
+        self.left_traj = RobotTrajectory()
         self.right_offset = []
         self.right_poses = None
-        self.right_traj = None
+        self.right_traj = RobotTrajectory()
         
         # Lower layer status setup
-        self.left_return = None
-        self.right_return = None
+        self.left_return = HLtoDL()
+        self.right_return = HLtoDL()
         
         # Create a transform listener
         self.listener = tf.TransformListener()
@@ -109,7 +110,10 @@ class DeliberativeModule(object):
         # Run through state machine and comms updates once each loop while rospy is running
         while not rospy.is_shutdown():
             print self.state
+            print self.substate
+            print ""
             self.run_state_machine()
+            self.publish_DLtoOp()
             rospy.sleep(0.01)
             #raw_input("Enter for next state...")
     
@@ -136,7 +140,7 @@ class DeliberativeModule(object):
         #       same computer as the DL. The right arm movegroup is assumed
         #       to be on a separate computer, requiring websocket comms.
         self.DL_to_left_HL_pub = rospy.Publisher("/deliberative/to_hl", DLtoHL, queue_size=1)
-        #self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "DLtoHL", rpack.pack_DLtoHL)
+        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "DLtoHL", rpack.pack_DL_to_HL)
         self.DL_to_Op_pub = rospy.Publisher("/deliberative/to_op", DLtoOp, queue_size=1)
         
         # Setup subscribers
@@ -149,7 +153,7 @@ class DeliberativeModule(object):
         Callback for the left arm habitual module messages.
         """
         self.left_return = msg
-    
+
     def right_hl_cb(self, msg):
         """
         Callback for right arm habitual module messages.
@@ -198,13 +202,24 @@ class DeliberativeModule(object):
         """
         
         # Fill out the DL to OP message from input info 
-        msg = DLtoOP()
+        msg = DLtoOp()
         msg.dl_status = self.status
         msg.right_status = self.right_return.status
         msg.left_status = self.left_return.status
-        
+        msg.fail_info = self.fail_info
         return msg
-    
+        
+    def publish_DLtoOp(self):
+        """
+        Publish a message to the operator
+        """
+        
+        # Create 'DLtoOP' message
+        msg = self.create_DLtoOp()
+        
+        # Publish it
+        self.DL_to_Op_pub.publish(msg)
+        
     #==== State Machine ===============================================#
     
     def run_state_machine(self):
@@ -225,6 +240,7 @@ class DeliberativeModule(object):
             if new_task:
                 self.state = "check commands"
                 self.old_goal = self.object_goal
+                self.status = 1
             else:
                 pass
         
@@ -235,10 +251,12 @@ class DeliberativeModule(object):
                 self.state = "determine move type"
             else:
                 self.state = "fail up"
+                self.status = 4
         
         # Determine the required planning type
         elif (self.state=="determine move type"):
             plan_type = self.determine_move_type(self.move_type)
+            self.status = 2
             if (plan_type=="dual-arm"):
                 self.state = "plan dual-arm"
                 self.substate = "plan object trajectory"
@@ -248,6 +266,7 @@ class DeliberativeModule(object):
                 self.state = "plan right arm"
             else:
                 self.state = "fail up"
+                self.status = 4
         
         # Plan a bimanual or coordinated movement of both arms
         elif (self.state=="plan dual-arm"):
@@ -298,6 +317,7 @@ class DeliberativeModule(object):
                 if left_traj_ok and right_traj_ok:
                     self.state = "execute plan"
                     self.substate = "send execution command"
+                    self.status = 3
                 else:
                     self.substate = "attempt error resolution"
 
@@ -306,6 +326,7 @@ class DeliberativeModule(object):
             elif (self.substate=="attempt error resolution"):
                 self.state = "fail up"
                 self.substate = ""
+                self.status = 4
         
         # Plan a single arm movement with the left arm
         #TODO
@@ -339,8 +360,10 @@ class DeliberativeModule(object):
                     pass
                 elif executing:
                     self.substate = "monitor execution"
+                    self.status = 5
                 else:
                     self.substate = "fail up"
+                    self.status = 7
             
             # A substate for monitoring the progress of the plan execution.
             elif (self.substate=="monitor execution"):
@@ -349,8 +372,10 @@ class DeliberativeModule(object):
                     pass
                 elif finished:
                     self.substate = "check completion"
+                    self.status = 6
                 else:
                     self.substate = "fail up"
+                    self.status = 7
             
             # A substate to check that the move succeded
             elif (self.substate=="check completion"):
@@ -358,18 +383,21 @@ class DeliberativeModule(object):
                 if success:
                     self.state = "standby"
                     self.substate = ""
+                    self.status = 0
+                    self.reset_module()
                 else:
                     self.state = "fail up"
+                    self.status = 7
         
         # Send message to operator on the nature of the error/failure
         elif (self.state=="fail up"):
-            self.send_failure_info()
+            pass # publisher will take care of this
     
     #==== Module Behaviors ============================================#
     
     def wait_for_command(self):
         """
-        Wait for the operator to sent a new command
+        Wait for the operator to send a new command
         """
         
         # check to see if the goal sent by the operator has changed
@@ -400,6 +428,7 @@ class DeliberativeModule(object):
             plan_type = "right"
         else:
             plan_type = "error"
+            self.fail_info = "Planning type not recognized"
             
         return plan_type
         
@@ -416,7 +445,7 @@ class DeliberativeModule(object):
         self.DL_to_right_HL_pub.send(right_msg)
         
         # Listen for the response that plans have been returned  
-        if (self.left_return==None) or (self.right_return==None):
+        if (self.left_return.status==1) or (self.right_return.status==1):
             plans_returned = False
             error = False
         elif (self.left_return.status==2) and (self.right_return.status==2): 
@@ -424,9 +453,13 @@ class DeliberativeModule(object):
             self.right_traj = self.right_return.trajectory
             plans_returned = True
             error = False
-        elif (self.left_return.status==3) or (self.left_return.status==3):
+        elif (self.left_return.status==3) or (self.right_return.status==3):
             plans_returned = False
             error = True
+            if (self.left_return.status==3):
+                self.fail_info = str(self.left_return.fail_msg)
+            elif (self.right_return.status==3):
+                self.fail_info = str(self.right_return.fail_msg)
         else:
             plans_returned = False
             error = False
@@ -451,7 +484,8 @@ class DeliberativeModule(object):
         elif (template=="pick_and_place"): # NOTE: NOT READY YET
             trajectory, timesteps = traj.create_pick_and_place_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
         else:
-            rospy.logerr("Trajectory type not found") # change
+            rospy.logerr("Trajectory template type not found")
+            self.fail_info = "Trajectory template type not found"
             trajectory = None
             timesteps = None
         
@@ -467,7 +501,8 @@ class DeliberativeModule(object):
             trans, rot = self.listener.lookupTransform(target_frame, origin_frame, rospy.Time(0))
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logerr("Failed to recieve the transform for {} to {}".format(origin_frame, target_frame)) #change
+            rospy.logerr("Failed to recieve the transform for {} to {}".format(origin_frame, target_frame))
+            self.fail_info("Failed to recieve the transform for {} to {}".format(origin_frame, target_frame))
             return "error" #change
             
     def check_trajectory(self, side):
@@ -496,6 +531,10 @@ class DeliberativeModule(object):
         elif (self.left_return.status==5) or (self.right_return.status==5):
             executing = False
             error = True
+            if (self.left_return.status==5):
+                self.fail_info = str(self.left_return.fail_msg)
+            elif (self.right_return.status==5):
+                self.fail_info = str(self.right_return.fail_msg)
         else: 
             executing = False
             error = False
@@ -513,23 +552,35 @@ class DeliberativeModule(object):
         elif (self.left_return.status==7) or (self.right_return.status==7):
             finished = False
             error = True
+            if (self.left_return.status==7):
+                self.fail_info = str(self.left_return.fail_msg)
+            elif (self.right_return.status==7):
+                self.fail_info = str(self.right_return.fail_msg)
         else:
             finished = False
             error = False
             
         return finished, error
         
+    def check_plan_achievement(self):
+        """
+        Check if the plan was completed
+        """
+        #TODO
+        return True
+        
     def reset_module(self):
         """
         Reset all the module's parameters to their start values.
         """
-        pass
-        
-    def send_failure_info(self):
-        """
-        Send information to the operator on the nature of the failure/error
-        """
-        print self.fail_info
+        self.stamps = None
+        self.obj_traj = None
+        self.left_offset = []
+        self.left_poses = None
+        self.left_traj = RobotTrajectory()
+        self.right_offset = []
+        self.right_poses = None
+        self.right_traj = RobotTrajectory()
 
 
 if __name__ == "__main__":
