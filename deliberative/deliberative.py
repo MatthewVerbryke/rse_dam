@@ -215,7 +215,7 @@ class DeliberativeModule(object):
         # TODO: CREATE AN INTERRUPT-HANDLER
         
         # MAIN STATE MACHINE
-        # Start (not nessecary/remove?)
+        # Start
         if (self.state=="start"): 
             self.state = "standby"
         
@@ -262,8 +262,8 @@ class DeliberativeModule(object):
             
             # Substate for getting end-effector offsets
             elif (self.substate=="get offsets"):
-                self.left_offset = adpt.compute_eef_offset(self.object_position, self.left_grasp_pose)
-                self.right_offset = adpt.compute_eef_offset(self.object_position, self.right_grasp_pose)
+                self.left_offset = adpt.compute_eef_offset(self.object_position, self.left_return.eef_pose)
+                self.right_offset = adpt.compute_eef_offset(self.object_position, self.right_return.eef_pose)
                 if (self.left_offset!=[]) and (self.right_offset!=[]):
                     self.substate = "plan eef trajectories"
                 else:

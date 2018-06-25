@@ -24,11 +24,13 @@ def pack_HL_to_DL(hltodl):
     # Prepare message info
     status = hltodl.status
     fail_msg = hltodl.fail_msg
+    eef_pose = pack_posestamped(hltodl.eef_pose)
     rt_msg = pack_robottrajectory(hltodl.trajectory)
     copy_msg = pack_DL_to_HL(hltodl.recieved_msg)
     
     # Package into dict
     hltodl_msg = {"status": status,
+                  "eef_pose": eef_pose,
                   "fail_msg": fail_msg,
                   "trajectory": rt_msg,
                   "recieved_msg": copy_msg}

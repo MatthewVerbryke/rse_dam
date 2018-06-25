@@ -17,7 +17,7 @@ import ast
 import copy
 import sys
  
-from geometry_msgs.msg import PoseStamped, PoseArray
+from geometry_msgs.msg import Pose, PoseStamped, PoseArray
 import moveit_commander
 from moveit_msgs.msg import RobotTrajectory
 from moveit_msgs.srv import GetPositionIK, GetPositionIKRequest, GetPositionIKResponse
@@ -96,18 +96,19 @@ class MoveItHabitualModule(object):
         # Task information setup
         self.new_command = 0
         self.move_type = 0
-        self.start_pose = None
-        self.goal_pose = None
-        self.command = None
+        self.start_pose = Pose()
+        self.goal_pose = Pose()
+        self.command =0
         self.executed = False
         
         # Trajectory information setup
-        self.stamps = None
-        self.pose_traj = None
-        self.trajectory = None
+        self.current_pose = PoseStamped()
+        self.stamps = ""
+        self.pose_traj = PoseArray()
+        self.trajectory = RobotTrajectory()
         
         # DL status setup
-        self.dl_return = None
+        self.dl_return = DLtoHL()
         
         # Planning information setup
         self.arm.allow_replanning(True)
@@ -203,6 +204,7 @@ class MoveItHabitualModule(object):
         msg = HLtoDL()
         msg.status = self.status
         msg.fail_msg = self.fail_info
+        msg.eef_pose = self.current_pose
         msg.trajectory = self.trajectory
         msg.recieved_msg = self.dl_return
         
@@ -223,7 +225,7 @@ class MoveItHabitualModule(object):
             self.state = "standby"
             self.status = 0
             
-        # Wait for commands from the DL
+        # Wait for commands from the DL, publish current eef pose while doing so
         elif (self.state=="standby"):
             self.status = 0
             new_command = self.wait_for_command()
@@ -306,6 +308,14 @@ class MoveItHabitualModule(object):
         """
         Wait for the DL to send down a new goal.
         """
+        
+        # retreive and publish the arms current eff position
+        self.get_current_eef_pose()
+        msg = self.create_HLtoDL()
+        if (self.side=="left"):
+            self.HL_to_DL_pub.publish(msg)
+        elif (self.side=="right"):
+            self.HL_to_DL_pub.send(msg)
         
         # Check the new command flag to see if this is a new command
         if (self.new_command==0):
@@ -594,13 +604,13 @@ class MoveItHabitualModule(object):
         self.increment = 0
         self.new_command = 0
         self.move_type = 0
-        self.start_pose = None
-        self.goal_pose = None
-        self.command = None
+        self.start_pose = Pose()
+        self.goal_pose = Pose()
+        self.command = 0
         self.executed = False
-        self.stamps = None
-        self.pose_traj = None
-        self.trajectory = None
+        self.stamps = ""
+        self.pose_traj = PoseArray()
+        self.trajectory = RobotTrajectory()
         
     def send_failure_info(self):
         """
@@ -612,9 +622,7 @@ class MoveItHabitualModule(object):
         """
         Get the current pose of the arm eef.
         """
-        pose = self.arm.get_current_pose(self.eef_link)
-        
-        return pose
+        self.current_pose = self.arm.get_current_pose(self.eef_link)
         
     #==== ROS Services ================================================#
         
