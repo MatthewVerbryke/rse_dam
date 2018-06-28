@@ -23,8 +23,6 @@ def is_pose_reachable(pose, side):
     """
     Determine if the given pose is a reachable pose for the end effector
     of a 5 DOF robot arm similar in kinematic structure to the WidowX arm.
-    
-    TODO: TEST
     """
     
     # Determine reference points based on side

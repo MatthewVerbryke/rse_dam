@@ -82,8 +82,6 @@ def create_in_place_rotation_trajectory(start_pose, goal_pose, ang_rate, ref_fra
     Creates a simple trajectory in which the object is rotated at a given
     angular rate to a new orientation with no positional change. Assumes 
     no obstacles are on the path for simplicity.
-    
-    TODO: TEST
     """
     
     timestep = 0.1
