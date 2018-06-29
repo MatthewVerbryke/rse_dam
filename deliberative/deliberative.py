@@ -66,7 +66,8 @@ class DeliberativeModule(object):
         
         # Task information setup
         self.move_type = 0
-        self.template = "simple_move" #TODO: DETERMINE THIS FROM MOVETYPE
+        self.traj_template = 0
+        self.template = ""
         self.object_position = Pose()
         self.object_goal = Pose()
         self.left_grasp_pose = Pose()
@@ -167,6 +168,7 @@ class DeliberativeModule(object):
         
         # Extract and store info from operator message
         self.move_type = msg.move_type
+        self.traj_template = msg.template
         self.object_position = msg.object_start
         self.object_goal = msg.object_goal
         self.left_grasp_pose = msg.left_grasp_pose
@@ -255,7 +257,7 @@ class DeliberativeModule(object):
         
         # Determine the required planning type
         elif (self.state=="determine move type"):
-            plan_type = self.determine_move_type(self.move_type)
+            plan_type = self.determine_move_type(self.move_type, self.traj_template)
             self.status = 2
             if (plan_type=="dual-arm"):
                 self.state = "plan dual-arm"
@@ -414,12 +416,14 @@ class DeliberativeModule(object):
         #TODO
         return True
         
-    def determine_move_type(self, op_type):
+    def determine_move_type(self, op_type, template_type):
         """
         Determine the type of planning that needs to be performed. In the 
         future, this may be detemined within this function versus just being
         told what to do.
         """
+        
+        # Determine the overall move_type
         if (op_type==1):
             plan_type = "dual-arm"
         elif (op_type==2):
@@ -429,6 +433,17 @@ class DeliberativeModule(object):
         else:
             plan_type = "error"
             self.fail_info = "Planning type not recognized"
+            
+        # Determine what trajectory template to use, if any
+        if (template_type==1):
+            self.template = "none"
+        elif (template_type==2):
+            self.template = "simple_move"
+        elif (template_type==3):
+            self.template = "in-place rotation"
+        else:
+            self.plan_type = "error"
+            self.fail_info = "Trajectory template type not recognized"
             
         return plan_type
         
@@ -483,6 +498,11 @@ class DeliberativeModule(object):
             trajectory, timesteps = traj.create_simple_move_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
         elif (template=="pick_and_place"): # NOTE: NOT READY YET
             trajectory, timesteps = traj.create_pick_and_place_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
+        elif (template=="none"):
+            rospy.logerr("Need to specify a trajectory template for dual-arm manipulation")
+            self.fail_info = "Need to specify a trajectory template for dual-arm manipulation"
+            trajectory = None
+            timesteps = None
         else:
             rospy.logerr("Trajectory template type not found")
             self.fail_info = "Trajectory template type not found"
@@ -573,6 +593,7 @@ class DeliberativeModule(object):
         """
         Reset all the module's parameters to their start values.
         """
+        self.template = ""
         self.stamps = None
         self.obj_traj = None
         self.left_offset = []

@@ -4,6 +4,12 @@
 #  - 3 = right_arm
 int16 move_type
 #
+# Trajectory template to use
+#  - 1 = none (use OMPL, etc.)
+#  - 2 = simple_move
+#  - 3 = in_place_rotation
+int16 template
+#
 # Pose of the target object
 geometry_msgs/Pose object_start
 #
