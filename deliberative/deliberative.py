@@ -496,6 +496,8 @@ class DeliberativeModule(object):
         # Create the object trajectory based on the template choice
         if (template=="simple_move"):
             trajectory, timesteps = traj.create_simple_move_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
+        elif (template=="in-place rotation"):
+            trajectory, timesteps = traj.create_in_place_rotation_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
         elif (template=="pick_and_place"): # NOTE: NOT READY YET
             trajectory, timesteps = traj.create_pick_and_place_trajectory(self.object_position, self.object_goal, self.move_speed, self.ref_frame)
         elif (template=="none"):

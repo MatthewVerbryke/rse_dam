@@ -311,7 +311,7 @@ class MoveItHabitualModule(object):
 
         # Send message to DL on the nature of the error/failure
         elif (self.state=="fail up"):
-            self.send_failure_info()
+            pass # publisher will take care of this
     
     #==== Module Behaviors ============================================#
     

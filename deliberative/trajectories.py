@@ -11,6 +11,7 @@
   TODO: IMPROVE DOCUMENTATION
 """
 
+
 import copy
 
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
