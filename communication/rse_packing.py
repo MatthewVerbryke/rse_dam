@@ -13,7 +13,7 @@
 
 import sys
 
-from packing import pack_robottrajectory, pack_pose, pack_posearray, pack_string 
+from packing import pack_robottrajectory, pack_pose, pack_posearray, pack_string, pack_posestamped
 
 
 def pack_HL_to_DL(hltodl):

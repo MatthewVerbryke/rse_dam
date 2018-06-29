@@ -140,7 +140,7 @@ class DeliberativeModule(object):
         #       same computer as the DL. The right arm movegroup is assumed
         #       to be on a separate computer, requiring websocket comms.
         self.DL_to_left_HL_pub = rospy.Publisher("/deliberative/to_hl", DLtoHL, queue_size=1)
-        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "DLtoHL", rpack.pack_DL_to_HL)
+        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "rse_dam_msgs/DLtoHL", rpack.pack_DL_to_HL)
         self.DL_to_Op_pub = rospy.Publisher("/deliberative/to_op", DLtoOp, queue_size=1)
         
         # Setup subscribers

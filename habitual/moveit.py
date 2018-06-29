@@ -175,7 +175,7 @@ class MoveItHabitualModule(object):
         if (self.side=="left"):
             self.HL_to_DL_pub = rospy.Publisher("/left_habitual/to_dl", HLtoDL, queue_size=1)
         elif (self.side=="right"):
-            self.HL_to_DL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/right_habitual/to_dl", "HLtoDL", rpack.pack_HL_to_DL)
+            self.HL_to_DL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/right_habitual/to_dl", "rse_dam_msgs/HLtoDL", rpack.pack_HL_to_DL)
         
         # Setup subscribers
         self.DL_to_HL_sub = rospy.Subscriber("/deliberative/to_hl", DLtoHL, self.dl_to_hl_cb)
