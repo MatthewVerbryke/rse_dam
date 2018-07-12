@@ -533,14 +533,12 @@ class DeliberativeModule(object):
         """
         Check to make sure the trajectory returned is safe and is 
         consistant with constraints. WIP
-        
-        TODO: TEST
         """
         
         # Setup
-        if (side="left"):
+        if (side=="left"):
             traj_points = self.left_traj.joint_trajectory.points
-        elif (side="right"):
+        elif (side=="right"):
             traj_points = self.right_traj.joint_trajectory.points
         joint_num = len(self.joint_max_velocity)
         interval_num = len(traj_points) - 1 
@@ -549,15 +547,15 @@ class DeliberativeModule(object):
         #   NOTE: avg_speed = (angle2 - angle1)/time
         for i in range(0,interval_num):
             for joint in range(0,joint_num):
-                prev_angle = traj_point[i].position[joint]
-                next_angle = traj_point[i+1].position[joint]
-                prev_time = traj.get_float_time(traj_point[i].time_from_start)
-                next_time = traj.get_float_time(traj_point[i].time_from_start)
+                prev_angle = traj_points[i].positions[joint]
+                next_angle = traj_points[i+1].positions[joint]
+                prev_time = traj.get_float_time(traj_points[i].time_from_start)
+                next_time = traj.get_float_time(traj_points[i+1].time_from_start)
                 avg_speed = (next_angle - prev_angle)/(next_time - prev_time)
                 if (abs(avg_speed)<self.joint_max_velocity[joint]):
                     pass # Should be okay
                 else:
-                    fail_info = "Joint {0} on the {1} exceeds maximum velocity limit in current trajectory".format(joint, side)
+                    self.fail_info = "Joint {0} on the {1} exceeds maximum velocity limit in current trajectory".format(joint, side)
                     return False
         return True
         

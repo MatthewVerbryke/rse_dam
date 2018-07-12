@@ -251,8 +251,6 @@ def get_float_time(stamp):
     """
     Convert a stamp style representation of time (sec, nsec) into a floating-
     point representation.
-    
-    TODO: TEST
     """
     
     # Convert nsec from nsecs (int) to seconds (float)
