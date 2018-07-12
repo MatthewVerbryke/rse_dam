@@ -53,6 +53,7 @@ if __name__ == "__main__":
          
         # General parameters (no alternatives ATM)
         robot_type = "boxbot"
+        joint_velocity_limits = "[0.785, 1.571, 1.571, 1.571, 1.571]"
         
         # Gazebo parameters
         sim_type = "gazebo"
@@ -65,7 +66,7 @@ if __name__ == "__main__":
         gripper_group = "widowx_gripper"
         HL_ref_frame = "origin_point"
         launch_rviz = True
-        joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"]
+        joint_names = "['joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5']"
         
         # Determine parameters dependent on computer
         if (computer_name=="Friday2"):

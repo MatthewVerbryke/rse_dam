@@ -246,4 +246,21 @@ def get_stamp(float_time):
     sec = int(float_time)
     
     return sec, nsec.nsecs
+    
+def get_float_time(stamp):
+    """
+    Convert a stamp style representation of time (sec, nsec) into a floating-
+    point representation.
+    
+    TODO: TEST
+    """
+    
+    # Convert nsec from nsecs (int) to seconds (float)
+    float_nsecs = float(stamp.nsecs)*0.000000001
+    
+    # Add the two components together
+    float_secs = float(stamp.secs) + float_nsecs
+
+    return float_secs
+
 

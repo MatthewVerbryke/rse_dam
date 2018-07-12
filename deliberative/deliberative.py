@@ -12,6 +12,7 @@
 """
 
 
+import ast
 import os
 import sys
 
@@ -53,6 +54,7 @@ class DeliberativeModule(object):
         self.left_eef_frame = sys.argv[2]
         self.right_eef_frame = sys.argv[3]
         self.connection = sys.argv[4]
+        self.joint_max_velocity = ast.literal_eval(sys.argv[5]) #<- Assuming for now both arms are the same
         rospy.loginfo("reference frame: {}".format(self.ref_frame))
         rospy.loginfo("left end effector: {}".format(self.left_eef_frame))
         rospy.loginfo("right end effector: {}".format(self.right_eef_frame))
@@ -530,9 +532,33 @@ class DeliberativeModule(object):
     def check_trajectory(self, side):
         """
         Check to make sure the trajectory returned is safe and is 
-        consistant with constraints.
+        consistant with constraints. WIP
+        
+        TODO: TEST
         """
-        #TODO
+        
+        # Setup
+        if (side="left"):
+            traj_points = self.left_traj.joint_trajectory.points
+        elif (side="right"):
+            traj_points = self.right_traj.joint_trajectory.points
+        joint_num = len(self.joint_max_velocity)
+        interval_num = len(traj_points) - 1 
+        
+        # Check that average speed for each servo are below limitations
+        #   NOTE: avg_speed = (angle2 - angle1)/time
+        for i in range(0,interval_num):
+            for joint in range(0,joint_num):
+                prev_angle = traj_point[i].position[joint]
+                next_angle = traj_point[i+1].position[joint]
+                prev_time = traj.get_float_time(traj_point[i].time_from_start)
+                next_time = traj.get_float_time(traj_point[i].time_from_start)
+                avg_speed = (next_angle - prev_angle)/(next_time - prev_time)
+                if (abs(avg_speed)<self.joint_max_velocity[joint]):
+                    pass # Should be okay
+                else:
+                    fail_info = "Joint {0} on the {1} exceeds maximum velocity limit in current trajectory".format(joint, side)
+                    return False
         return True
         
     def execute_plan(self):
