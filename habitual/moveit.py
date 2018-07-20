@@ -27,6 +27,7 @@ import rospy
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 import reachability as rech
+import correction as crct
 
 # retrive files nessecary for websocket comms
 file_dir = sys.path[0]
@@ -86,6 +87,7 @@ class MoveItHabitualModule(object):
         self.eef_link = self.arm.get_end_effector_link()
         self.target_ref_frame = self.ref_frame
         self.arm.set_pose_reference_frame(self.ref_frame)
+        self.correction_needed = True
         
         # Module information setup
         self.state = "start"
@@ -299,7 +301,7 @@ class MoveItHabitualModule(object):
                     self.status = 7
                     
             # Let the DL know the HL is done
-            # TODO: A BETTER WAY TO DO THIS?
+            # FIXME: A BETTER WAY TO DO THIS?
             elif self.executed and (self.status==6):
                 self.increment += 1 
                 if (self.increment<=50):
@@ -481,6 +483,8 @@ class MoveItHabitualModule(object):
         """
         Given a list of poses and a list of corrosponding timestamps for 
         the group, construct a 'RobotTrajectory'.
+        
+        TODO: re-test
         """
         
         # Initialize trajectory
@@ -519,9 +523,15 @@ class MoveItHabitualModule(object):
             joint_positions = [None]*5 
             
             # Remove the gripper joints from the message 
-            # TODO: better way to do this?
+            # FIXME: better way to do this?
             for j in range(0,5):
                 joint_positions[j] = resp.solution.joint_state.position[j]
+                
+            # Wrist joint correction for the WidowX arm
+            if self.correction_needed:
+                fk_resp = self.fk_solve(joint_positions, self.eef_link)
+                roll_angle = crct.correct_wrist_angle(fk_resp, points_array.poses[i])
+                joint_postions[4] = roll_angle
         
             # Format the outputs
             trajectory_point.positions = joint_positions
@@ -623,7 +633,7 @@ class MoveItHabitualModule(object):
         Given a set of joint angles for the robot, use forward kinematics
         to determine the end-effector pose reached with those angles
 
-        https://github.com/uts-magic-lab/moveit_python_tools/blob/master/src/moveit_python_tools/get_fk.py
+        CRED: https://github.com/uts-magic-lab/moveit_python_tools/blob/master/src/moveit_python_tools/get_fk.py
         """
         
         # Build the service request
@@ -635,7 +645,7 @@ class MoveItHabitualModule(object):
         # Try to send the request to the 'compute_fk' service
         try:
             resp = self.fk_srv.call(req)
-            return resp.pose_stamped
+            return resp
             
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
@@ -645,7 +655,7 @@ class MoveItHabitualModule(object):
         Given a end-effector pose, use inverse kinematics to determine the
         nessecary joint angles to reach the pose.
         
-        https://github.com/uts-magic-lab/moveit_python_tools/blob/master/src/moveit_python_tools/get_ik.py
+        CRED: https://github.com/uts-magic-lab/moveit_python_tools/blob/master/src/moveit_python_tools/get_ik.py
         """
         
         # Build the the service request
