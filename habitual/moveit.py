@@ -116,6 +116,7 @@ class MoveItHabitualModule(object):
         self.arm.allow_replanning(True)
         self.arm.set_goal_position_tolerance(0.001)
         self.arm.set_goal_orientation_tolerance(0.01)
+        self.arm.set_goal_joint_tolerance(0.001)
         rospy.loginfo("MoveIt! interface initialized")
         
         # Setup a connection to the 'compute_ik' service
@@ -375,69 +376,21 @@ class MoveItHabitualModule(object):
     
     def plan_to_target(self, goal):
         """
-        Condensed planning function for all allowed target types. Still 
-        WIP.
-        
-        TODO: FINISH IT
+        Condensed planning function for several allowed target types: joint
+        state, pose, named_target
         """
         
         # Setup
         self.arm.set_start_state_to_current_state()
         self.arm.clear_pose_targets()
-        goal_type = type(goal)
         
         # Determine nessecary setup action from goal type
-        if (type(goal_type)==Pose):
-            pass
-        elif(type(goal_type)==JointState):
-            pass
-        elif(type(goal_type)==str):     
+        if (type(goal)==Pose):
+            self.arm.set_pose_target(goal, self.eef_link)
+        elif(type(goal)==list):
+            self.arm.set_joint_value_target(goal)
+        elif(type(goal)==str):     
             self.arm.set_named_target(goal)
-        
-        # Plan the trajectory
-        self.trajectory = self.arm.plan()
-        
-    def plan_to_pose_goal(self, pose):
-        """
-        Create a trajectory plan for the group from the current pose to 
-        the goal pose.
-        """
-        
-        # Get the target pose from the function input
-        target_pose = pose
-        
-        # Set the start state to the current state
-        self.arm.set_start_state_to_current_state()
-
-        # Set the goal pose to the target pose
-        self.arm.set_pose_target(target_pose, self.eef_link)
-
-        # Plan the trajectory
-        self.trajectory = self.arm.plan()
-        
-    def plan_to_joint_angle_goal(self, joint_angles):
-        """
-        Create a trajectory plan for the group from the current pose to 
-        the goal joint angle target.
-        """
-        
-        # Clear the pose targets
-        self.arm.clear_pose_targets()
-        
-        # Set the joint value target
-        self.arm.set_joint_value_target(joint_angles)
-        
-        # Plan the trajectory
-        self.trajectory = self.arm.plan()
-        
-    def plan_to_named_pose(self, named_pose):
-        """
-        Create a trajectory plan for the group from the current pose to 
-        the goal joint angle target.
-        """
-        
-        # Set the named pose as the planning target
-        self.arm.set_named_target(named_pose)
         
         # Plan the trajectory
         self.trajectory = self.arm.plan()
@@ -530,8 +483,8 @@ class MoveItHabitualModule(object):
             # Wrist joint correction for the WidowX arm
             if self.correction_needed:
                 fk_resp = self.fk_solve(joint_positions, self.eef_link)
-                roll_angle = crct.correct_wrist_angle(fk_resp, points_array.poses[i])
-                joint_postions[4] = roll_angle
+                roll_angle = crct.correct_wrist_angle(fk_resp.pose_stamped[0].pose, points_array.poses[i])
+                joint_positions[4] = roll_angle
         
             # Format the outputs
             trajectory_point.positions = joint_positions
@@ -636,11 +589,18 @@ class MoveItHabitualModule(object):
         CRED: https://github.com/uts-magic-lab/moveit_python_tools/blob/master/src/moveit_python_tools/get_fk.py
         """
         
+        # Build joint state message
+        joint_state = JointState()
+        joint_state.header.frame_id = self.ref_frame
+        joint_state.header.stamp = rospy.Time.now()
+        joint_state.name = self.joint_names
+        joint_state.position = joint_angles
+        
         # Build the service request
         req = GetPositionFKRequest()
         req.header.frame_id = self.ref_frame
         req.fk_link_names = [link_names]
-        req.robot_state.joint_state = joint_angles
+        req.robot_state.joint_state = joint_state
         
         # Try to send the request to the 'compute_fk' service
         try:

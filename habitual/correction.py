@@ -31,7 +31,6 @@ def correct_wrist_angle(eef_pose, goal_pose):
     
     NOTE: assumes that the returned eef_pose is pointed in the right 
     direction, but is not rolled correctly
-
     """
        
     # Get quaternion components
@@ -64,7 +63,8 @@ def correct_wrist_angle(eef_pose, goal_pose):
         theta = math.acos(np.dot(eef_xvec, goal_xvec)/1)
         cross_prod = np.cross(eef_xvec, goal_xvec)
         cross_unit = (cross_prod/np.linalg.norm(cross_prod))
-        if np.allclose(cross_unit, eef_zvec, 1e-02, 0):
+        cross_diff = math.acos(np.dot(cross_unit,eef_zvec))
+        if (cross_diff<=0.01):
             theta_signed = theta
         else:
             theta_signed = -theta
