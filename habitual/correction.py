@@ -50,29 +50,24 @@ def correct_wrist_angle(eef_pose, goal_pose):
     eef_rot = eef_tf_matrix[0:3,0:3]
     goal_rot = goal_tf_matrix[0:3,0:3]
     
-    
     # Determine unit vectors
     eef_xvec = np.dot(eef_rot, [1, 0, 0])
     eef_zvec = np.dot(eef_rot, [0, 0, 1])
     goal_xvec = np.dot(goal_rot, [1, 0, 0])
     goal_zvec = np.dot(goal_rot, [0, 0, 1])
     
-    #If z-unit-vectors match up, determine the angle between the two x-unit-vectors
-    if np.allclose(eef_zvec, goal_zvec, 1e-04, 0): #NOTE: tolerances may be a problem
-        if np.allclose(eef_xvec, goal_xvec):
-            theta_signed = 0.0
+    # Angle difference between the z-unit vectors
+    z_diff = math.acos(np.dot(eef_zvec, goal_zvec)/1)
+    
+    #If z-unit-vectors match up, determine the angle between the two x-unit-vectors and its sign
+    if (z_diff<=0.01): #tolerances are loose to compensate for relatively loose IK solver tolerances (~0.01 rad)
+        theta = math.acos(np.dot(eef_xvec, goal_xvec)/1)
+        cross_prod = np.cross(eef_xvec, goal_xvec)
+        cross_unit = (cross_prod/np.linalg.norm(cross_prod))
+        if np.allclose(cross_unit, eef_zvec, 1e-02, 0):
+            theta_signed = theta
         else:
-            eef_x_norm = np.linalg.norm(eef_xvec)
-            goal_x_norm = np.linalg.norm(eef_xvec)
-            theta = math.acos(np.dot(eef_xvec, goal_xvec)/(eef_x_norm*goal_x_norm))
-            
-            # Determine the sign of the rotation angle
-            cross_prod = np.cross(eef_xvec, goal_xvec)
-            cross_unit = (cross_prod/np.linalg.norm(cross_prod))
-            if np.allclose(cross_unit, eef_zvec, 1e-02, 0): #<-at this point we know they should be the same, so we are more concerned with direction than value
-                theta_signed = theta
-            else:
-                theta_signed = -theta
+            theta_signed = -theta
         return theta_signed
     else:
         return False
