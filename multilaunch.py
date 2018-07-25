@@ -172,14 +172,20 @@ if __name__ == "__main__":
             tabtitle.extend(["arm-state"])
             command.extend([''' cd communication
                                 python arm_state.py %(connection)s %(left_arm)s %(robot_type)s
-        ''' % locals()])
+            ''' % locals()])
+        # Clock publisher    
+        if launch_gazebo:
+            tabtitle.extend(["clock publisher"])
+            command.extend([''' cd communication
+                                python clock.py %(connection)s
+            ''' % locals()])
             
         # Arm command
         if launch_arm_command:
             tabtitle.extend(["arm-command"])
             command.extend([''' cd communication
                                 python arm_commands.py %(connection)s %(left_arm)s %(robot_type)s
-        ''' % locals()])
+            ''' % locals()])
         
             # Wait for the state publisher on the left computer start first
             sleep(2)
@@ -234,18 +240,18 @@ if __name__ == "__main__":
                                 python %(DL_call)s %(DL_ref_frame)s %(left_eef_frame)s %(right_eef_frame)s %(connection)s
             ''' % locals()])
             
-        # Ready the new terminal
-        terminal4 = ['gnome-terminal']
-        for i in range(len(command)):
-            terminal4.extend(['--tab', '-e', '''
-                bash -c '
-                    %s
-                    read
-                '
-            ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
-        
-        subprocess.call(terminal4)
-        sleep(4)
+            # Ready the new terminal
+            terminal4 = ['gnome-terminal']
+            for i in range(len(command)):
+                terminal4.extend(['--tab', '-e', '''
+                    bash -c '
+                        %s
+                        read
+                    '
+                ''' % (command[i],), '-t', '%s' % (tabtitle[i],)])
+            
+            subprocess.call(terminal4)
+            sleep(4)
         
         print("All init-scripts have now been called.")
     
