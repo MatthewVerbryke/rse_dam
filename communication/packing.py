@@ -120,7 +120,22 @@ def unpack_string(dictmsg):
     string.data = str(string_data)
     
     return string
-
+    
+def pack_time(time):
+    """
+    Unpackage 'ROS/time' message.
+    """
+    
+    # Get time data
+    data = time.clock
+    seconds = data.secs
+    nanoseconds = data.nsecs
+    
+    # Place data into dictionary
+    time_msg = {"clock": {"secs": seconds,
+                          "nsecs": nanoseconds}}
+                
+    return time_msg
 
 def pack_pose(pose):
     """
