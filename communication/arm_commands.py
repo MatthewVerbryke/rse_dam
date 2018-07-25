@@ -58,6 +58,7 @@ class JointCommandsPublisher():
         self.w_next = rospy.Time.now() + self.w_delta
         self.r_delta = rospy.Duration(1.0/rospy.get_param("~read_rate", 10.0))
         self.r_next = rospy.Time.now() + self.r_delta
+        self.r = rospy.Rate(10.0)
 
         self.ws = []
         self.subs = []
@@ -105,10 +106,10 @@ class JointCommandsPublisher():
         while not rospy.is_shutdown():
             
             # Publish the commands
-            #if rospy.Time.now() > self.r_next:
-            for i in range(0,len(self.ws)):
-                self.ws[i].send(self.commands[i])
-            rospy.sleep(0.01)
+            if rospy.Time.now() > self.r_next:
+                for i in range(0,len(self.ws)):
+                    self.ws[i].send(self.commands[i])
+            self.r.sleep()
         
     def cleanup(self):
         """

@@ -70,6 +70,7 @@ class ArmStatePublisher():
         self.w_next = rospy.Time.now() + self.w_delta
         self.r_delta = rospy.Duration(1.0/rospy.get_param("~read_rate", 10.0))
         self.r_next = rospy.Time.now() + self.r_delta
+        self.r = rospy.Rate(100.0)
         
         # Run publisher
         rospy.loginfo("Arm state publisher initialized")
@@ -91,7 +92,7 @@ class ArmStatePublisher():
             # Send the states out at the appropriate time
             if rospy.Time.now() > self.r_next:
                 ws.send(self.robot_joint_state)
-                rospy.sleep(0.01)
+            self.r.sleep()
 
     def cleanup(self):
         """

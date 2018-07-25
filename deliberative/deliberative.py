@@ -54,7 +54,7 @@ class DeliberativeModule(object):
         self.left_eef_frame = sys.argv[2]
         self.right_eef_frame = sys.argv[3]
         self.connection = sys.argv[4]
-        self.joint_max_velocity = ast.literal_eval(sys.argv[5]) #<- Assuming for now both arms are the same
+        self.joint_max_velocity = [0.785, 1.571, 1.571, 1.571, 1.571] #<- FIXME: For now placed here, later more customizable
         rospy.loginfo("reference frame: {}".format(self.ref_frame))
         rospy.loginfo("left end effector: {}".format(self.left_eef_frame))
         rospy.loginfo("right end effector: {}".format(self.right_eef_frame))

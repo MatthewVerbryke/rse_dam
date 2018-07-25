@@ -19,14 +19,14 @@ from geometry_msgs.msg import Pose
 from rse_dam_msgs.msg import OptoDL, DLtoOp
 
 
-test = 3
+test = 2
 
-# Simple move test
+# horizontal move test
 if (test==1):
     start_pose = Pose()
     start_pose.position.x = 0.24
-    start_pose.position.y = 0.0
-    start_pose.position.z = 0.2659
+    start_pose.position.y = -0.075
+    start_pose.position.z = 0.26035
     start_pose.orientation.x = 0.0
     start_pose.orientation.y = 0.0
     start_pose.orientation.z = 0.0
@@ -35,7 +35,7 @@ if (test==1):
     goal_pose = Pose()
     goal_pose.position.x = 0.24
     goal_pose.position.y = 0.075
-    goal_pose.position.z = 0.2659
+    goal_pose.position.z = 0.26035
     goal_pose.orientation.x = 0.0
     goal_pose.orientation.y = 0.0
     goal_pose.orientation.z = 0.0
@@ -59,14 +59,10 @@ if (test==1):
 
 # TODO
 elif (test==2):
-    pass
-
-# In-place rotation test
-elif (test==3):
     start_pose = Pose()
     start_pose.position.x = 0.24
     start_pose.position.y = 0.0
-    start_pose.position.z = 0.2659
+    start_pose.position.z = 0.15
     start_pose.orientation.x = 0.0
     start_pose.orientation.y = 0.0
     start_pose.orientation.z = 0.0
@@ -75,7 +71,43 @@ elif (test==3):
     goal_pose = Pose()
     goal_pose.position.x = 0.24
     goal_pose.position.y = 0.0
-    goal_pose.position.z = 0.2659
+    goal_pose.position.z = 0.38
+    goal_pose.orientation.x = 0.0
+    goal_pose.orientation.y = 0.0
+    goal_pose.orientation.z = 0.0
+    goal_pose.orientation.w = 1.0
+
+    # Not tested
+    left_grasp_pose = Pose()
+    right_grasp_pose = Pose()
+    
+    msg = OptoDL()
+    msg.move_type = 1
+    msg.template = 2
+    msg.object_start = start_pose
+    msg.object_goal = goal_pose
+    msg.left_grasp_pose = left_grasp_pose
+    msg.right_grasp_pose = right_grasp_pose
+    msg.left_gap = 0.0
+    msg.right_gap = 0.0
+    msg.move_speed = 0.01
+    msg.lift_height = 0.0
+
+# In-place rotation test
+elif (test==3):
+    start_pose = Pose()
+    start_pose.position.x = 0.24
+    start_pose.position.y = 0.0
+    start_pose.position.z = 0.26035
+    start_pose.orientation.x = 0.0
+    start_pose.orientation.y = 0.0
+    start_pose.orientation.z = 0.0
+    start_pose.orientation.w = 1.0
+
+    goal_pose = Pose()
+    goal_pose.position.x = 0.24
+    goal_pose.position.y = 0.0
+    goal_pose.position.z = 0.26035
     goal_pose.orientation.x = 0.0
     goal_pose.orientation.y = 0.0
     goal_pose.orientation.z = 0.087
