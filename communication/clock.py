@@ -9,11 +9,12 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: improve documentation across the board
-
+  TODO: improve documentation
 """
 
+
 import sys
+import thread
 
 from rosgraph_msgs.msg import Clock
 import rospy
@@ -27,11 +28,8 @@ from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 from rss_git_lite.common import rosConnectWrapper as rC
 
 
-# Pass in as arguments
-CONNECTION = "ws://192.168.0.51:9090/" #<--change!
-
 class SimClockPublisher():
-    """  """
+    """ A ROS node to publish the values of the clock t a new computer"""
     
     def __init__(self):
         
@@ -44,6 +42,12 @@ class SimClockPublisher():
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
         
+        # Get a lock
+        self.lock = thread.allocate_lock()
+        
+        # Set the publishing rate (1000 hz)
+        self.r = rospy.Rate(1000.0)
+        
         # 'robot/joint_state' Subscriber
         rospy.Subscriber("/clock", Clock, self.time_cb)
         
@@ -51,15 +55,41 @@ class SimClockPublisher():
         ws = rC.RosMsg("ws4py", self.connection, "pub", "/clock", "rosgraph_msgs/Clock", pack_time)
         
         # Run publisher
-        rospy.loginfo("Clock initialized")
+        rospy.loginfo("Clock publisher initialized")
         self.publish_clock(ws)
         
     def time_cb(self, msg):
         """
-        Callback for gazebo clock.
+        Callback for gazebo /clock.
         """
-        self.clock_time = msg
         
+        self.lock.acquire()
+        self.clock_time = msg
+        self.lock.release()
+        
+    def copy_and_clear_received():
+        """
+        Clear out received data once retrieved/pulled.
+        """
+        
+        self.lock.acquire()
+        clock_current = self.clock_time
+        self.clock_time = None
+        self.lock.release()
+        
+        return clock_current
+    
+    def copy_received():
+        """
+        just give whatever was last received, don't clear out or overwrite anything.
+        """
+        
+        self.lock.acquire()
+        clock_current = self.clock_time
+        self.lock.release()
+        
+        return clock_current
+    
     def publish_clock(self, ws):
         """
         Retrieve and publish the clock time.
@@ -67,8 +97,12 @@ class SimClockPublisher():
         
         # Publish the clock to the other computer
         while not rospy.is_shutdown():
-            ws.send(self.clock_time)
-            rospy.sleep(0.001)
+            clock_current = self.copy_and_clear_received()
+            if (clock_current==None):
+                pass
+            else:
+                ws.send(clock_current)
+            self.r.sleep()
 
     def cleanup(self):
         """
