@@ -8,7 +8,7 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: IMPROVE DOCUMENTATION
+  TODO: improve documentation
 """
 
 import copy

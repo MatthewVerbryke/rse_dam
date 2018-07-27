@@ -8,13 +8,14 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: IMPROVE DOCUMENTATION
+  TODO: improve documentation
 """
 
 
 import ast
 import os
 import sys
+import thread
 
 from geometry_msgs.msg import Pose, PoseArray
 from moveit_msgs.msg import RobotTrajectory
@@ -37,8 +38,6 @@ from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 class DeliberativeModule(object):
     """
     The RSE Deliberative Module for a dual-armed robot.
-    
-    TODO: TEST
     """
     
     def __init__(self):
@@ -48,6 +47,9 @@ class DeliberativeModule(object):
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
+        
+        # Get a lock
+        self.lock = thread.allocate_lock()
         
         # Get relevent parameters
         self.ref_frame = sys.argv[1]
@@ -96,7 +98,7 @@ class DeliberativeModule(object):
         
         # Create a transform listener
         self.listener = tf.TransformListener()
-        rospy.sleep(1.0)        
+        rospy.sleep(1.0)
         
         # Initialize communications for the layer
         self.comms_initialization()
@@ -134,8 +136,6 @@ class DeliberativeModule(object):
     def comms_initialization(self):
         """
         Intialize communications for the deliberative module.
-        
-        TODO: TEST
         """
         
         # Setup publishers
@@ -155,20 +155,29 @@ class DeliberativeModule(object):
         """
         Callback for the left arm habitual module messages.
         """
+        
+        # Get the left habitual layer message
+        self.lock.acquire()
         self.left_return = msg
+        self.lock.release()
 
     def right_hl_cb(self, msg):
         """
         Callback for right arm habitual module messages.
         """
+        
+        # Get the right habitual layer message
+        self.lock.acquire()
         self.right_return = msg
-    
+        self.lock.release()
+        
     def op_cb(self, msg):
         """
         Callback for operator messages.
         """
         
         # Extract and store info from operator message
+        self.lock.acquire()
         self.move_type = msg.move_type
         self.traj_template = msg.template
         self.object_position = msg.object_start
@@ -179,12 +188,11 @@ class DeliberativeModule(object):
         self.right_gap = msg.right_gap
         self.move_speed = msg.move_speed
         self.lift_height = msg.lift_height
+        self.lock.release()
         
     def create_DLtoHL(self, new_cmd, move_type, poses, stamps, target_pose, command):
         """
         Create a 'DLtoHL' message
-        
-        TODO: TEST
         """
         
         # Fill out DL to HL message from input info
@@ -201,8 +209,6 @@ class DeliberativeModule(object):
     def create_DLtoOp(self):
         """
         Create a 'DLtoOp' message
-        
-        TODO: TEST
         """
         
         # Fill out the DL to OP message from input info 
@@ -229,11 +235,11 @@ class DeliberativeModule(object):
     def run_state_machine(self):
         """
         Run through the DL state machine.
+        
+        TODO: create an interrupt handler
         """
         
-        # TODO: CREATE AN INTERRUPT-HANDLER
-        
-        # MAIN STATE MACHINE
+        # Main State Machine
         # Start
         if (self.state=="start"): 
             self.state = "standby"
@@ -325,15 +331,13 @@ class DeliberativeModule(object):
                 else:
                     self.substate = "attempt error resolution"
 
-            # Substate for trying to resolve issues with the trajectories in order to replan
-            #TODO
+            #TODO: Substate for trying to resolve issues with the trajectories in order to replan
             elif (self.substate=="attempt error resolution"):
                 self.state = "fail up"
                 self.substate = ""
                 self.status = 4
         
-        # Plan a single arm movement with the left arm
-        #TODO
+        # TODO: Plan a single arm movement with the left arm
         elif (self.state=="plan left arm"):
             side = "left"
             plan_made = self.create_single_arm_trajectory(side)
@@ -342,8 +346,7 @@ class DeliberativeModule(object):
             else:
                 self.state = "fail up"
         
-        # Plan a single arm movement with the right arm
-        #TODO
+        # TODO: Plan a single arm movement with the right arm
         elif (self.state=="plan right arm"):
             side = "right"
             plan_made = self.create_single_arm_trajectory(side)
@@ -412,10 +415,9 @@ class DeliberativeModule(object):
         
     def check_command(self):
         """
-        Check and see if the plan given by the operator is at least basically
-        possible.
+        TODO: Check and see if the plan given by the operator is at least
+        basically possible.
         """
-        #TODO
         return True
         
     def determine_move_type(self, op_type, template_type):
@@ -485,7 +487,7 @@ class DeliberativeModule(object):
         
     def create_single_arm_trajectory(self, side):
         """
-        
+        TODO: Create a plan for a single arm move
         """
         pass
         
@@ -610,9 +612,8 @@ class DeliberativeModule(object):
         
     def check_plan_achievement(self):
         """
-        Check if the plan was completed
+        TODO: Check if the plan was completed
         """
-        #TODO
         return True
         
     def reset_module(self):

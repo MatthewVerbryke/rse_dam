@@ -9,12 +9,12 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: improve documentation across the board
-  
-  TODO: TEST THIS
+  TODO: improve documentation
 """
 
-import sys 
+
+import sys
+import thread
 
 from sensor_msgs.msg import JointState
 import rospy
@@ -28,13 +28,15 @@ from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 from rss_git_lite.common import rosConnectWrapper as rC
 
 
-# Pass in as arguments
-ROBOT = "boxbot"
-CONNECTION = "ws://192.168.0.51:9090/" #<--change!
-ARM = "right"
-
 class ArmStatePublisher():
-    """  """
+    """ 
+    A ROS node to publish the joint states of the Boxbot arms to the secondary
+    computer.
+        
+    WARNING: Currently specific to the dual WidowX arm setup I'm running
+    
+    TODO: More generalized version
+    """
     
     def __init__(self):
         
@@ -48,6 +50,7 @@ class ArmStatePublisher():
         elif (left_arm=="False"):
             self.arm = "right"
         
+        # Storage lists/dicts
         self.header = {}
         self.position = []
         self.velocity = []
@@ -59,18 +62,17 @@ class ArmStatePublisher():
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
         
+        # Get a lock
+        self.lock = thread.allocate_lock()
+        
+        # Setup publishing rate (100 Hz)
+        self.rate = rospy.Rate(100.0)
+        
         # 'robot/joint_state' Subscriber
         rospy.Subscriber("{}/joint_states".format(self.robot), JointState, self.get_joint_states)
         
         # Setup ROSbridge publisher
         ws = rC.RosMsg("ws4py", self.connection, "pub", "{}/joint_states".format(self.robot), "sensor_msgs/JointState", pack_jointstate)
-        
-        # Setup timessteps
-        self.w_delta = rospy.Duration(1.0/rospy.get_param("~write_rate", 10.0))
-        self.w_next = rospy.Time.now() + self.w_delta
-        self.r_delta = rospy.Duration(1.0/rospy.get_param("~read_rate", 10.0))
-        self.r_next = rospy.Time.now() + self.r_delta
-        self.r = rospy.Rate(100.0)
         
         # Run publisher
         rospy.loginfo("Arm state publisher initialized")
@@ -80,19 +82,51 @@ class ArmStatePublisher():
         """
         Callback for joint states.
         """
+        
+        # Get the current right arm joint states
+        self.lock.acquire()
         self.robot_joint_state = msg
+        self.lock.release()
+    
+    def copy_and_clear_received(self):
+        """
+        Clear out received data once retrieved/pulled.
+        """
+        
+        # Send the clock time and clear the state variable
+        self.lock.acquire()
+        arm_state_current = self.robot_joint_state
+        self.robot_joint_state = None
+        self.lock.release()
+        
+        return arm_state_current
+    
+    def copy_received(self):
+        """
+        Give the value that was last received but don't clear or overwrite
+        it.
+        """
+        
+        # Send the clock time
+        self.lock.acquire()
+        arm_state_current = self.robot_joint_state
+        self.lock.release()
+        
+        return arm_state_current
         
     def publish_arm_state(self, ws):
         """
         Retrieve and publish the current state of the arm.
         """
         
+        # Send the states out only if a new joint state message is recieved
         while not rospy.is_shutdown():
-            
-            # Send the states out at the appropriate time
-            if rospy.Time.now() > self.r_next:
-                ws.send(self.robot_joint_state)
-            self.r.sleep()
+            arm_state_current = self.copy_and_clear_received()
+            if (arm_state_current==None):
+                pass
+            else:
+                ws.send(arm_state_current)
+            self.rate.sleep()
 
     def cleanup(self):
         """

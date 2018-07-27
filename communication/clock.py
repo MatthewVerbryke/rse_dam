@@ -45,10 +45,10 @@ class SimClockPublisher():
         # Get a lock
         self.lock = thread.allocate_lock()
         
-        # Set the publishing rate (1000 hz)
-        self.r = rospy.Rate(1000.0)
+        # Set the publishing rate (1 kHz)
+        self.rate = rospy.Rate(1000.0)
         
-        # 'robot/joint_state' Subscriber
+        # '/clock' Subscriber
         rospy.Subscriber("/clock", Clock, self.time_cb)
         
         # Setup ROSbridge publisher
@@ -63,15 +63,17 @@ class SimClockPublisher():
         Callback for gazebo /clock.
         """
         
+        # Get the current gazebo clock time
         self.lock.acquire()
         self.clock_time = msg
         self.lock.release()
         
-    def copy_and_clear_received():
+    def copy_and_clear_received(self):
         """
         Clear out received data once retrieved/pulled.
         """
         
+        # Send the clock time and clear the state variable
         self.lock.acquire()
         clock_current = self.clock_time
         self.clock_time = None
@@ -79,11 +81,13 @@ class SimClockPublisher():
         
         return clock_current
     
-    def copy_received():
+    def copy_received(self):
         """
-        just give whatever was last received, don't clear out or overwrite anything.
+        Give the value that was last received but don't clear or overwrite
+        it.
         """
         
+        # Send the clock time
         self.lock.acquire()
         clock_current = self.clock_time
         self.lock.release()
@@ -95,14 +99,14 @@ class SimClockPublisher():
         Retrieve and publish the clock time.
         """
         
-        # Publish the clock to the other computer
+        # Publish the clock to the other computer only if a new clock time is recieved
         while not rospy.is_shutdown():
             clock_current = self.copy_and_clear_received()
             if (clock_current==None):
                 pass
             else:
                 ws.send(clock_current)
-            self.r.sleep()
+            self.rate.sleep()
 
     def cleanup(self):
         """

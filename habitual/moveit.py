@@ -9,13 +9,14 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: IMPROVE DOCUMENTATION
+  TODO: improve documentation
 """
 
 
 import ast
 import copy
 import sys
+import thread
  
 from geometry_msgs.msg import Pose, PoseStamped, PoseArray
 import moveit_commander
@@ -42,8 +43,6 @@ from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 class MoveItHabitualModule(object):
     """
     RSE habitual layer for a dual-armed robot, using a MoveIt interface.
-    
-    TODO: TEST
     """
     
     def __init__(self):
@@ -60,6 +59,9 @@ class MoveItHabitualModule(object):
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
+        
+        # Get a lock
+        self.lock = thread.allocate_lock()
         
         # Get command line arguments
         self.planning_group = sys.argv[1]
@@ -167,8 +169,6 @@ class MoveItHabitualModule(object):
     def comms_initialization(self):
         """
         Intialize communications for the MoveIt interface.
-        
-        TODO: TEST
         """
         
         # Setup publishers
@@ -189,6 +189,7 @@ class MoveItHabitualModule(object):
         """
         
         # Extract and store info from deliberative message
+        self.lock.acquire()
         self.new_command = msg.new_cmd
         self.move_type = msg.move_type
         self.pose_traj = msg.poses
@@ -198,6 +199,7 @@ class MoveItHabitualModule(object):
         
         # Store last response
         self.dl_return = msg
+        self.lock.release()
         
     def create_HLtoDL(self):
         """
@@ -233,11 +235,11 @@ class MoveItHabitualModule(object):
     def run_state_machine(self):
         """
         Run throught the HL state machine
+        
+        TODO: create an interrupt handler
         """
         
-        # TODO: CREATE AN INTERRUPT-HANDLER
-        
-        # MAIN STATE MACHINE
+        # Main State Machine
         # Start
         if (self.state=="start"):
             self.state = "standby"
@@ -261,8 +263,7 @@ class MoveItHabitualModule(object):
                 self.state = "fail up"
                 self.status = 3
                 
-        # Make a plan for the gripper to close or open
-        # TODO
+        # TODO: Make a plan for the gripper to close or open
         
         # Make a joint trajectory plan for the arm from given poses and timestamps
         elif (self.state=="assemble plan"):
@@ -275,8 +276,7 @@ class MoveItHabitualModule(object):
                 self.state = "fail up"
                 self.status = 3
         
-        # Make a joint trajectory plan using MoveIt planning interface
-        # TODO
+        # TODO: Make a joint trajectory plan using MoveIt planning interface
         
         # Send plan to DL and wait to recieve an execution command
         elif (self.state=="recieve execution command"):
@@ -302,7 +302,7 @@ class MoveItHabitualModule(object):
                     self.status = 7
                     
             # Let the DL know the HL is done
-            # FIXME: A BETTER WAY TO DO THIS?
+            # FIXME: a better way to do this?
             elif self.executed and (self.status==6):
                 self.increment += 1 
                 if (self.increment<=50):
@@ -323,7 +323,7 @@ class MoveItHabitualModule(object):
         Wait for the DL to send down a new goal.
         """
         
-        # retrieve the current eff position
+        # Retrieve the current eff position
         self.get_current_eef_pose()
         
         # Check the new command flag to see if this is a new command
@@ -336,10 +336,10 @@ class MoveItHabitualModule(object):
         """
         Determine if given pose(s) are reachable by the arm.
         
-        TODO: ADD SINGLE ARM AND GRIPPER CHECKS
+        TODO: Add checks for gripper planning and single arm planning
         """
         
-        # passing on gripper planning for now 
+        # Passing on gripper planning for now 
         if (self.move_type==0):
             return True
         
@@ -351,7 +351,7 @@ class MoveItHabitualModule(object):
                     pass
                 else:
                     self.fail_info = "At least one of the points in the specified {} trajectory may not be reachable".format(self.side)
-                    return False # <- somewhat crude, replace?
+                    return False # <- FIXME: somewhat crude, replace?
             return True
             
         # Passing on RRT planning for now
@@ -400,7 +400,7 @@ class MoveItHabitualModule(object):
         For a RobotTrajectory, determine the end-effector pose at each 
         time step along the trajectory.
         
-        TODO: TEST THIS FUNCTION
+        TODO: test this function
         """
         
         # Create the output array
@@ -436,8 +436,6 @@ class MoveItHabitualModule(object):
         """
         Given a list of poses and a list of corrosponding timestamps for 
         the group, construct a 'RobotTrajectory'.
-        
-        TODO: re-test
         """
         
         # Initialize trajectory
@@ -506,7 +504,7 @@ class MoveItHabitualModule(object):
         """
         Open or close the gripper to a given joint angle goal.
         
-        TODO: REWORK
+        TODO: Rework
         """
         
         # Set the joint goal for the gripper
@@ -542,7 +540,7 @@ class MoveItHabitualModule(object):
         """
         Execute the given trajectory plan.
         
-        TODO: REWORK
+        TODO: Rework?
         """
         
         # Execute the generated plan

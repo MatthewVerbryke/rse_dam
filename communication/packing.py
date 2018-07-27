@@ -11,14 +11,15 @@
     -geometry_msgs/PoseStamped
     -geometry_msgs/PoseArray     (packing only)
     -sensor_msgs/JointState      (packing only)
-    -moveit_msgs/RobotTrajectory (packing only) 
+    -moveit_msgs/RobotTrajectory (packing only)
+    -rosgraph_msgs/Clock         (packing only)
 
   Copyright 2018 University of Cincinnati
   All rights reserved. See LICENSE file at:
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: improve documentation across the board
+  TODO: improve documentation
 """
 
 
@@ -123,7 +124,7 @@ def unpack_string(dictmsg):
     
 def pack_time(time):
     """
-    Unpackage 'ROS/time' message.
+    Unpackage 'rosgraph_msgs/Clock' message.
     """
     
     # Get time data
@@ -284,19 +285,6 @@ def pack_jointstate(jointstate):
     return jointstate_msg
     
 def unpack_jointstate(datalist):
-    """
-    TODO
-    """
-    pass
-
-
-def pack_diagnosticarray(datalist):
-    """
-    TODO
-    """
-    pass
-    
-def unpack_diagnosticarray(dictmsg):
     """
     TODO
     """

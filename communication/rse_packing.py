@@ -8,7 +8,7 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
 
-  TODO: improve documentation across the board
+  TODO: improve documentation
 """
 
 import sys
@@ -40,8 +40,6 @@ def pack_HL_to_DL(hltodl):
 def pack_DL_to_HL(dltohl):
     """
     Package "rse_dam_msgs/DLtoHL" message.
-    
-    TODO: TEST
     """
     
     # Prepare message info
