@@ -146,8 +146,8 @@ class JointCommandsPublisher():
         
         # Return the joint command and clear the state variable
         self.lock.acquire()
-        command_current = self.command[joint]
-        self.command[joint] = None
+        command_current = self.commands[joint]
+        self.commands[joint] = None
         self.lock.release()
         
         return command_current
@@ -160,7 +160,7 @@ class JointCommandsPublisher():
         
         # Return the joint command
         self.lock.acquire()
-        command_current = self.command[joint]
+        command_current = self.commands[joint]
         self.lock.release()
         
         return command_current

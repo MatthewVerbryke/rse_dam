@@ -13,9 +13,10 @@
 import sys
 
 import rosbag
+import matplotlib.pyplot as plt
 
 
-class RSESimBagParser:
+class RSESimBagParser(object):
     """
     Parse bag file data and prepare for figure printing for sim data.
     """
@@ -26,25 +27,50 @@ class RSESimBagParser:
         bag_name = sys.argv[1]
         self.bag = rosbag.Bag(str(bag_name))
         
+        # Get what data needs to be graphed
+        self.graph_clock = False
+        self.graph_eef_pose = False
+        self.graph_contacts = True
+        
         # Initialize holding lists
         self.state_time = []
+        self.system_time = []
         self.left_contact_time = []
         self.right_contact_time = []
+        self.clock_time = []
         self.left_eef_state = []
         self.right_eef_state = []
         self.left_force = []
         self.left_torque = []
         self.right_force = []
         self.right_torque = []
+        
+        # Run
+        self.main()
 
+    def parse_clock (self):
+        """
+        Parse the .bag file for the gazebo clock time.
+        """
+        
+        # Parse the 'clock' topic to get the relation between system time and clock time
+        for topic, msg, t in self.bag.read_messages(topics=['/clock']):
+            
+            # Convert stamp into float time
+            time = self.get_float_time(t)
+            self.system_time.append(time)
+            
+            # Parse the clock time 
+            cl_time = self.get_float_time(msg.clock)
+            self.clock_time.append(cl_time)
+        
     def parse_eef_states(self):
         """
         Parse the .bag file for end effector state information data.
         """
-        
-        # Parse '/link_states' topic to get the desired link states out
+        # Parse the '/link_states' topic to get the desired link states out
         for topic, msg, t in self.bag.read_messages(topics=['/gazebo/link_states']):
-            
+
             # Convert stamp into float time
             time = self.get_float_time(t)
             self.state_time.append(time) 
@@ -54,7 +80,7 @@ class RSESimBagParser:
             self.left_eef_state.append(msg.pose[left_index])
             right_index = msg.name.index("boxbot::right_wrist_2_link")
             self.right_eef_state.append(msg.pose[right_index])
-    
+            
     def parse_contact_states(self):
         """
         Parse the .bag file for contact state data
@@ -62,7 +88,7 @@ class RSESimBagParser:
         
         # Parse right contact states topic to get contact force data out
         for topic, msg, t in self.bag.read_messages(topics=['/left_test_block_contact_state']):
-
+            
             # Convert stamp into float time
             r_time = self.get_float_time(msg.header.stamp)
             self.left_contact_time.append(r_time)
@@ -70,6 +96,7 @@ class RSESimBagParser:
             # Parse the message for force info
             if (msg.states==[]):
                 self.left_force.append(0.0)
+                self.left_torque.append(0.0)
             else:
                 for contact in msg.states:
                     self.left_force.append(contact.total_wrench.force)
@@ -85,10 +112,12 @@ class RSESimBagParser:
             # Parse the message for force info
             if (msg.states==[]):
                 self.right_force.append(0.0)
+                self.right_torque.append(0.0)
             else:
                 for contact in msg.states:
                     self.right_force.append(contact.total_wrench.force)
                     self.right_torque.append(contact.total_wrench.torque)
+                    print right_force
         
     def get_float_time(self, stamp):
         """
@@ -103,6 +132,90 @@ class RSESimBagParser:
         float_secs = float(stamp.secs) + float_nsecs
 
         return float_secs
+        
+    def plot_poses(self, side):
+        """
+        Plot the poses of the end-effectors
+        """
+        
+        t = []
+        x = []
+        y = []
+        z = []
+        
+        # Get times
+        for time in self.state_time:
+            t.append(time)
+        
+        # Determine pose components
+        if (side=="left"):
+            for pose in self.left_eef_state:
+                x.append(pose.position.x)
+                y.append(pose.position.y)
+                z.append(pose.position.z)
+                qx.append(pose.orientation.x)
+                qy.append(pose.orientation.y)
+                qz.append(pose.orientation.z)
+                qw.append(pose.orientation.w)
+        elif (side=="right"):
+            for pose in self.right_eef_state:
+                x.append(pose.position.x)
+                y.append(pose.position.y)
+                z.append(pose.position.z)
+                qx.append(pose.orientation.x)
+                qy.append(pose.orientation.y)
+                qz.append(pose.orientation.z)
+                qw.append(pose.orientation.w)
+                
+        # Plot the results
+        plt.plot(t, x, c='r', ls='-')
+        plt.plot(t, y, c='g', ls='-')
+        plt.plot(t, z, c='b', ls='-')
+        plt.show()
+        
+    def plot_forces(self):
+        """
+        Plot forces on the test blocks.
+        """
+        
+        # Plot forces
+        plt.plot(self.right_contact_time, self.right_force, c='c', ls='-')
+        plt.plot(self.left_contact_time, self.left_force, c='m', ls='-')
+        plt.show()
+        
+        # Plot torques
+        plt.plot(self.right_contact_time, self.right_torque, c='c', ls='-')
+        plt.plot(self.left_contact_time, self.left_torque, c='m', ls='-')
+        plt.show()
+        
+    def main(self):
+        """
+        Main execution loop
+        """
+        
+        # Parse topic data
+        self.parse_clock()
+        self.parse_eef_states()
+        self.parse_contact_states()
+        
+        # Check clock to message time difference
+        #for time in range(0,len(self.system_time)):
+            #diff = self.system_time[time] - self.clock_time[time]
+            #print diff
+
+        # See if clock time and recorded time match up
+        if self.graph_clock:
+            self.plot_graphs(self.system_time, self.clock_time)
+        
+        # Plot the end-effector pose histories
+        if self.graph_eef_pose:
+            self.plot_poses("left")
+            self.plot_poses("right")
+            
+        # Plot the interblock forces
+        if self.graph_contacts:
+            self.plot_forces()
+        
     
     def close_bag(self):
         """
@@ -112,10 +225,4 @@ class RSESimBagParser:
 
 
 if __name__ == "__main__":
-    try:
-        test = RSEBagParser()
-        test.parse_eef_states()
-        test.parse_contact_states()
-        test.close_bag()
-    except:
-        pass
+    RSESimBagParser()
