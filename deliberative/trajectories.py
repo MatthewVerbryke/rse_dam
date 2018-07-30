@@ -28,7 +28,7 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     simplicity.
     """
     
-    timestep = 0.1
+    timestep = 0.35
     
     # Get distances between the start and end points
     delta_x = goal_pose.position.x - start_pose.position.x
@@ -75,6 +75,7 @@ def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     
     # Package result
     trajectory.poses = pose_list
+    #trajectory.header.stamp = rospy.Time.now() + rospy.Duration(10.0)
     
     return trajectory, timestamps
     

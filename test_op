@@ -19,9 +19,9 @@ from geometry_msgs.msg import Pose
 from rse_dam_msgs.msg import OptoDL, DLtoOp
 
 
-test = 2
+test = 3
 
-# horizontal move test
+# Horizontal move test
 if (test==1):
     start_pose = Pose()
     start_pose.position.x = 0.24
@@ -56,8 +56,8 @@ if (test==1):
     msg.right_gap = 0.0
     msg.move_speed = 0.01
     msg.lift_height = 0.0
-
-# TODO
+    
+# Vertical move test
 elif (test==2):
     start_pose = Pose()
     start_pose.position.x = 0.24
@@ -129,6 +129,41 @@ elif (test==3):
     msg.move_speed = 0.01
     msg.lift_height = 0.0
 
+# Fail: out of reach
+elif (test==4):
+    start_pose = Pose()
+    start_pose.position.x = 0.24
+    start_pose.position.y = 0.0
+    start_pose.position.z = 0.26035
+    start_pose.orientation.x = 0.0
+    start_pose.orientation.y = 0.0
+    start_pose.orientation.z = 0.0
+    start_pose.orientation.w = 1.0
+
+    goal_pose = Pose()
+    goal_pose.position.x = 0.24
+    goal_pose.position.y = 0.0
+    goal_pose.position.z = 0.
+    goal_pose.orientation.x = 0.0
+    goal_pose.orientation.y = 0.0
+    goal_pose.orientation.z = 0.0
+    goal_pose.orientation.w = 1.0
+
+    # Not tested
+    left_grasp_pose = Pose()
+    right_grasp_pose = Pose()
+
+    msg = OptoDL()
+    msg.move_type = 1
+    msg.template = 2
+    msg.object_start = start_pose
+    msg.object_goal = goal_pose
+    msg.left_grasp_pose = left_grasp_pose
+    msg.right_grasp_pose = right_grasp_pose
+    msg.left_gap = 0.0
+    msg.right_gap = 0.0
+    msg.move_speed = 0.01
+    msg.lift_height = 0.0
 
 def pubber():
     pub = rospy.Publisher("operator/to_dl", OptoDL, queue_size=10)
