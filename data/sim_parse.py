@@ -10,6 +10,7 @@
 """
 
 
+import math
 import sys
 
 import rosbag
@@ -29,14 +30,16 @@ class RSESimBagParser(object):
         
         # Get what data needs to be graphed
         self.graph_clock = False
-        self.graph_eef_pose = False
+        self.graph_eef_pose = True
         self.graph_contacts = True
+        self.graph_block = True
         
         # Initialize holding lists
         self.state_time = []
         self.system_time = []
         self.left_contact_time = []
         self.right_contact_time = []
+        self.contact_time = []
         self.clock_time = []
         self.left_eef_state = []
         self.right_eef_state = []
@@ -44,6 +47,8 @@ class RSESimBagParser(object):
         self.left_torque = []
         self.right_force = []
         self.right_torque = []
+        self.block_force = []
+        self.block_torque = []
         
         # Run
         self.main()
@@ -99,8 +104,16 @@ class RSESimBagParser(object):
                 self.left_torque.append(0.0)
             else:
                 for contact in msg.states:
-                    self.left_force.append(contact.total_wrench.force)
-                    self.left_torque.append(contact.total_wrench.torque)
+                    total_force = []
+                    total_torque = [] 
+                    total_force.append(math.sqrt((contact.total_wrench.force.x)**2
+                                   + (contact.total_wrench.force.y)**2
+                                   + (contact.total_wrench.force.z)**2))
+                    total_torque.append(math.sqrt((contact.total_wrench.torque.x)**2
+                                   + (contact.total_wrench.torque.y)**2
+                                   + (contact.total_wrench.torque.z)**2))
+                self.left_force.append(sum(total_force))
+                self.left_torque.append(sum(total_torque))
                     
         # Parse right contact states topic to get contact force data out
         for topic, msg, t in self.bag.read_messages(topics=['/right_test_block_contact_state']):
@@ -114,11 +127,44 @@ class RSESimBagParser(object):
                 self.right_force.append(0.0)
                 self.right_torque.append(0.0)
             else:
+                total_force = []
+                total_torque = [] 
                 for contact in msg.states:
-                    self.right_force.append(contact.total_wrench.force)
-                    self.right_torque.append(contact.total_wrench.torque)
-                    print right_force
+                    total_force.append(math.sqrt((contact.total_wrench.force.x)**2
+                                   + (contact.total_wrench.force.y)**2
+                                   + (contact.total_wrench.force.z)**2))
+                    total_torque.append(math.sqrt((contact.total_wrench.torque.x)**2
+                                   + (contact.total_wrench.torque.y)**2
+                                   + (contact.total_wrench.torque.z)**2))
+                self.right_force.append(sum(total_force))
+                self.right_torque.append(sum(total_torque))
+    
+    def parse_block_contact_states(self):
         
+        # Parse right contact states topic to get contact force data out
+        for topic, msg, t in self.bag.read_messages(topics=['/block_contact_state']):
+            
+            # Convert stamp into float time
+            r_time = self.get_float_time(msg.header.stamp)
+            self.contact_time.append(r_time)
+            
+            # Parse the message for force info
+            if (msg.states==[]):
+                self.block_force.append(0.0)
+                self.block_torque.append(0.0)
+            else:
+                for contact in msg.states:
+                    total_force = []
+                    total_torque = [] 
+                    total_force.append(math.sqrt((contact.total_wrench.force.x)**2
+                                   + (contact.total_wrench.force.y)**2
+                                   + (contact.total_wrench.force.z)**2))
+                    total_torque.append(math.sqrt((contact.total_wrench.torque.x)**2
+                                   + (contact.total_wrench.torque.y)**2
+                                   + (contact.total_wrench.torque.z)**2))
+                self.block_force.append(sum(total_force))
+                self.block_torque.append(sum(total_torque))
+    
     def get_float_time(self, stamp):
         """
         Convert a stamp style representation of time (sec, nsec) into a floating-
@@ -142,6 +188,10 @@ class RSESimBagParser(object):
         x = []
         y = []
         z = []
+        qx = []
+        qy = []
+        qz = []
+        qw = []
         
         # Get times
         for time in self.state_time:
@@ -181,11 +231,21 @@ class RSESimBagParser(object):
         # Plot forces
         plt.plot(self.right_contact_time, self.right_force, c='c', ls='-')
         plt.plot(self.left_contact_time, self.left_force, c='m', ls='-')
-        plt.show()
+        plt.plot(self.contact_time, self.left_force, c='c', ls='-')
         
         # Plot torques
         plt.plot(self.right_contact_time, self.right_torque, c='c', ls='-')
         plt.plot(self.left_contact_time, self.left_torque, c='m', ls='-')
+        plt.show()
+        
+    def plot_block_forces(self):
+        """
+        Plot forces on the 'loose' test block
+        """
+        
+        # Plot forces and torques
+        plt.plot(self.contact_time, self.left_force, c='c', ls='-')
+        plt.plot(self.contact_time, self.left_torque, c='c', ls='--')
         plt.show()
         
     def main(self):
@@ -196,7 +256,7 @@ class RSESimBagParser(object):
         # Parse topic data
         self.parse_clock()
         self.parse_eef_states()
-        self.parse_contact_states()
+        self.parse_block_contact_states()
         
         # Check clock to message time difference
         #for time in range(0,len(self.system_time)):
@@ -211,11 +271,16 @@ class RSESimBagParser(object):
         if self.graph_eef_pose:
             self.plot_poses("left")
             self.plot_poses("right")
-            
-        # Plot the interblock forces
+        
+        # Plot the loose block forces and position
+        if self.graph_block:
+            self.plot_block_forces()
+        
+        # Plot the test-block forces
         if self.graph_contacts:
             self.plot_forces()
-        
+            
+        self.bag.close()
     
     def close_bag(self):
         """
