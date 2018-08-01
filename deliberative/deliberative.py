@@ -557,7 +557,7 @@ class DeliberativeModule(object):
                 if (abs(avg_speed)<self.joint_max_velocity[joint]):
                     pass # Should be okay
                 else:
-                    self.fail_info = "Joint {0} on the {1} exceeds maximum velocity limit in current trajectory".format(joint, side)
+                    self.fail_info = "Joint {0} on the {1} exceeds maximum velocity limit in current trajectory: angular velocity {2}".format(joint, side, avg_speed)
                     return False
         return True
         

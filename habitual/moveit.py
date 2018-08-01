@@ -350,7 +350,7 @@ class MoveItHabitualModule(object):
                 if reachable:
                     pass
                 else:
-                    self.fail_info = "At least one of the points in the specified {} trajectory may not be reachable".format(self.side)
+                    self.fail_info = "The pose {} is not reachable by the {} arm.".format(pose, self.side)
                     return False # <- FIXME: somewhat crude, replace?
             return True
             
@@ -465,8 +465,8 @@ class MoveItHabitualModule(object):
             # Get the joint states using IK
             resp = self.ik_solve(pose_req, feed_joint_state)
             if (resp.error_code.val!=1):
-                rospy.logerr("IK solver failed on waypoint {} with error code {}".format(i, resp.error_code.val))
-                self.fail_info = "IK solver failed on waypoint {} with error code {}".format(i, resp.error_code.val)
+                rospy.logerr("IK solver failed on pose {} with error code {}".format(pose_req.pose, resp.error_code.val))
+                self.fail_info = "IK solver failed on pose {} with error code {}".format(pose_req.pose, resp.error_code.val)
                 return False
             
             # Initialize JointTrajectoryPoint message

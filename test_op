@@ -19,7 +19,7 @@ from geometry_msgs.msg import Pose
 from rse_dam_msgs.msg import OptoDL, DLtoOp
 
 
-test = 3
+test = 6
 
 # Horizontal move test
 if (test==1):
@@ -134,7 +134,7 @@ elif (test==4):
     start_pose = Pose()
     start_pose.position.x = 0.24
     start_pose.position.y = 0.0
-    start_pose.position.z = 0.26035
+    start_pose.position.z = 0.15
     start_pose.orientation.x = 0.0
     start_pose.orientation.y = 0.0
     start_pose.orientation.z = 0.0
@@ -143,7 +143,7 @@ elif (test==4):
     goal_pose = Pose()
     goal_pose.position.x = 0.24
     goal_pose.position.y = 0.0
-    goal_pose.position.z = 0.
+    goal_pose.position.z = 0.45
     goal_pose.orientation.x = 0.0
     goal_pose.orientation.y = 0.0
     goal_pose.orientation.z = 0.0
@@ -163,6 +163,78 @@ elif (test==4):
     msg.left_gap = 0.0
     msg.right_gap = 0.0
     msg.move_speed = 0.01
+    msg.lift_height = 0.0
+
+# Fail: Bad orientation
+elif (test==5):
+    start_pose = Pose()
+    start_pose.position.x = 0.24
+    start_pose.position.y = 0.0
+    start_pose.position.z = 0.15
+    start_pose.orientation.x = 0.0
+    start_pose.orientation.y = 0.0
+    start_pose.orientation.z = 0.0
+    start_pose.orientation.w = 1.0
+
+    goal_pose = Pose()
+    goal_pose.position.x = 0.24
+    goal_pose.position.y = 0.0
+    goal_pose.position.z = 0.38
+    goal_pose.orientation.x = 0.0
+    goal_pose.orientation.y = 0.0
+    goal_pose.orientation.z = 0.087
+    goal_pose.orientation.w = 0.996
+
+    # Not tested
+    left_grasp_pose = Pose()
+    right_grasp_pose = Pose()
+
+    msg = OptoDL()
+    msg.move_type = 1
+    msg.template = 2
+    msg.object_start = start_pose
+    msg.object_goal = goal_pose
+    msg.left_grasp_pose = left_grasp_pose
+    msg.right_grasp_pose = right_grasp_pose
+    msg.left_gap = 0.0
+    msg.right_gap = 0.0
+    msg.move_speed = 0.01
+    msg.lift_height = 0.0
+
+# Fail: Too fast
+elif (test==6):
+    start_pose = Pose()
+    start_pose.position.x = 0.24
+    start_pose.position.y = 0.0
+    start_pose.position.z = 0.15
+    start_pose.orientation.x = 0.0
+    start_pose.orientation.y = 0.0
+    start_pose.orientation.z = 0.0
+    start_pose.orientation.w = 1.0
+
+    goal_pose = Pose()
+    goal_pose.position.x = 0.24
+    goal_pose.position.y = 0.0
+    goal_pose.position.z = 0.38
+    goal_pose.orientation.x = 0.0
+    goal_pose.orientation.y = 0.0
+    goal_pose.orientation.z = 0.0
+    goal_pose.orientation.w = 1.0
+
+    # Not tested
+    left_grasp_pose = Pose()
+    right_grasp_pose = Pose()
+
+    msg = OptoDL()
+    msg.move_type = 1
+    msg.template = 2
+    msg.object_start = start_pose
+    msg.object_goal = goal_pose
+    msg.left_grasp_pose = left_grasp_pose
+    msg.right_grasp_pose = right_grasp_pose
+    msg.left_gap = 0.0
+    msg.right_gap = 0.0
+    msg.move_speed = 1.00
     msg.lift_height = 0.0
 
 def pubber():
