@@ -1,6 +1,7 @@
 #!/usr/bin/env python
+
 """
-  Main deliberative-layer module for one robotic arm in a dual-arm setup.
+  Main habitual-layer module for one robotic arm in a dual-arm setup.
 
   Copyright 2020 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -12,21 +13,18 @@
 """
 
 
-import math
 import os
 import sys
 import thread
 
-from geometry_msgs.msg import Pose, PoseArray
-from moveit_msgs.msg import RobotTrajectory
 import rospy
 
 from csa_msgs.msg import CSADirective, CSAResponse
 
 
-class DeliberativeModule(object):
+class HabitualModule(object):
     """
-    The $MODULE_NAME$ object class
+    The HabitualModule object class
     """
     
     #==== INITIALIZATION ==============================================#
@@ -38,9 +36,9 @@ class DeliberativeModule(object):
         
         # Get CWD
         home_cwd = os.getcwd()
-
+        
         # Initialize rospy node
-        rospy.init_node("deliberative_module")
+        rospy.init_node("habitual_module")
         rospy.loginfo("Node initialized")
         
         # Initialize cleanup for the node
@@ -54,35 +52,25 @@ class DeliberativeModule(object):
         
         # Setup parameters 
         self.rate = rospy.get_param("~rate", 100.0)
+        self.side = rospy.get_param("~side", "")
         self.robot = rospy.get_param("~robot", "")
-        self.connection = rospy.get_param("secondary_ip", "")
+        self.connection = rospy.get_param("~primary_ip", "")
         self.ref_frame = rospy.get_param("~reference_frame", "world")
         
         # Parse out joint information
         self.joints = []
-        sefl.joints_max_velocity = []
         for name in rospy.get_param("~joints", dict().keys()):
             self.joints.append(name)
-            max_velocity = rospy.get_param("~joints/"+name+"/max_speed")
-            self.joints_max_velocity.append(math.radians(max_velocity)
         
         # Setup variables
         self.directives = []
+        self.RL_response = CSAResponse()
         self.status = ""
         self.description = ""
-        self.seq_count = 0
-        self.object_position = Pose()
-        self.object_goal = Pose()
-        self.grasps = [Pose(), Pose()]
-        self.offsets = [0.0, 0.0]
-        self.move_speed = 0.0
-        self.old_goal = Pose()
-        self.trajectories = [RobotTrajectory(), RobotTrajectory()]
-        self.left_response = CSAResponse()
-        self.right_response = CSAResponse()
+        self.cur_directive = 0
+        self.seq = 0
         self.new_directive_flag = False
-        self.left_directive_recieved_flag = False
-        self.right_directive_recieved_flag = False
+        self.directive_recieved_flag = False
         
         # Initialize communications
         self.init_comms()
@@ -106,7 +94,7 @@ class DeliberativeModule(object):
         """
         
         rospy.sleep(1)
-        rospy.loginfo("Shutting down 'deliberative_module' node")
+        rospy.loginfo("Shutting down habitual_module node")
         
     #==== COMMUNICATIONS ==============================================#
         
@@ -117,34 +105,28 @@ class DeliberativeModule(object):
         """
         
         # Message topic names
-        up_directive = "{}/OP_directive".format(self.robot)
-        up_response = "{}/DL_response".format(self.robot)
-        left_directive = "{}/left_arm/DL_directive".format(self.robot)
-        right_directive = "{}/right_arm/DL_directive".format(self.robot)
-        left_response = "{}/left_arm/HL_response".format(self.robot)
-        right_response = "{}/right_arm/HL_response".format(self.robot)
+        up_directive = "{}/{}_arm/DL_directive".format(self.robot, 
+                                                         self.side)
+        up_response = "{}/{}_arm/HL_response".format(self.robot,
+                                                       self.side)
+        down_directive = "{}/{}_arm/HL_directive".format(self.robot, 
+                                                         self.side)
+        down_response = "{}/{}_arm/RL_response".format(self.robot,
+                                                            self.side)
         state_info = "{}/state_info".format(self.robot)
         
         # Setup ROS Publishers
         self.up_response_pub = rospy.Publisher(up_response, CSAResponse,
                                                queue_size=1)
-        self.left_directive_pub = rospy.Publisher(left_directive,
-                                                  CSADirective,
+        self.down_directive_pub = rospy.Publisher(down_directive, CSADirective,
                                                   queue_size=1)
-        self.right_directive_pub = rospy.Publisher(right_directive,
-                                                   CSADirective,
-                                                   queue_size=1)
         
         # Setup ROS Subscribers
         #self.state_info_sub = rospy.Subscriber(state_info, $STATETOPIC$, $STATECALLBACK$)
         self.up_directive_sub = rospy.Subscriber(up_directive, CSADirective,
-                                                 self.directive_cb)
-        self.left_response_sub = rospy.Subscriber(left_response,
-                                                  CSAResponse,
-                                                  self.left_response_cb)
-        self.right_response_sub = rospy.Subscriber(right_response,
-                                                   CSAResponse,
-                                                   self.left_response_cb)
+                                              self.directive_cb)
+        self.down_response_sub = rospy.Subscriber(down_response, CSAResponse,
+                                                  self.response_cb)
         
     def build_response(self, poses, joint_trajectory):
         """
@@ -200,41 +182,22 @@ class DeliberativeModule(object):
         else:
             self.directives.append(msg)
             self.new_directive_flag = True
-        
+            
         # Release
         self.lock.release()
             
-    def left_response_cb(self, msg):
+    def response_cb(self, msg):
         """
-        Callback function for responses sent from the left habitual
-        module.
+        Callback function for responses sent from the reflexive module.
         """
         
         # Lock
         self.lock.acquire()
         
-        # Retreive Message
-        self.left_response = msg
-        if self.msg.msg_recieved = True
-            self.left_directive_recieved_flag = True
-            
-        # Release
-        self.lock.release()
-            
-    def right_response_cb(self, msg):
-        """
-        Callback function for responses sent from the right habitual
-        module.
-        """
-        
-        # Lock
-        self.lock.acquire()
-        
-        # Retreive Message
-        self.right_response = msg
+        self.RL_response = msg
         if self.msg.msg_recieved = True
             self.directive_recieved_flag = True
-            
+    
         # Release
         self.lock.release()
     
@@ -290,7 +253,7 @@ class DeliberativeModule(object):
 
 if __name__ == "__main__":
     try:
-        module_node = DeliberativeModule()
+        module_node = HabitualModule()
     except rospy.ROSInterruptException:
         pass
         
