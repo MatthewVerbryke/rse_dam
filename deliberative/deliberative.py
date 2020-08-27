@@ -144,7 +144,7 @@ class DeliberativeModule(object):
                                                   self.left_response_cb)
         self.right_response_sub = rospy.Subscriber(right_response,
                                                    CSAResponse,
-                                                   self.left_response_cb)
+                                                   self.right_response_cb)
         
     def build_response(self, poses, joint_trajectory):
         """
