@@ -32,8 +32,8 @@ from sympy.matrices import Matrix, eye, zeros
 
 def get_jacobian_function(DH_param):
     """
-    Create the required functions to get the Jacobian during runtime
-    based on the DH parameters of the arm.
+    Create the required functions to get the Jacobian based on the DH 
+    parameters of the arm.
     
     NOTE: DH parameterization based on that found in John J. Craig's 
           "Introduction to Robotics, Mechanics and Control" 3rd edition
@@ -181,7 +181,7 @@ def main():
         # Go to this directory
         os.chdir(J_dir)
     
-        # Write function to file
+        # Write function to file 
         with open('jacobian.py', 'w') as target:
             for item in write_list:
                 target.write(item)

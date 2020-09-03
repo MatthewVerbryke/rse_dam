@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 """
   Main deliberative-layer module for one robotic arm in a dual-arm setup.
 
