@@ -11,12 +11,12 @@
 
 Header header
 
-string[] left_names
+sensor_msgs/JointState left_joint_state
 float64[] left_jacobian
 geometry_msgs/Pose left_eef_state
 diagnostic_msgs/DiagnosticStatus[] left_status
 
-string[] right_names
+sensor_msgs/JointState right_joint_state
 float64[] right_jacobian
 geometry_msgs/Pose right_eef_state
 diagnostic_msgs/DiagnosticStatus[] right_status

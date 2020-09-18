@@ -72,6 +72,7 @@ generate_messages(
    diagnostic_msgs
    geometry_msgs
    moveit_msgs
+   sensor_msgs
  )
 
 ################################################
