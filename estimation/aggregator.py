@@ -11,20 +11,21 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit
   history.
-  
-  TODO: Test pretty much everything
 """
 
 
 import thread
 
 import rospy
-import sensor_msgs.msg import JointState
+from sensor_msgs.msg import JointState
 
 
 class JointStateAggregator(object):
     """
-    ROS node for aggregating joint state messages across the system
+    ROS node for aggregating joint state messages across the system.
+    
+    WARN: Do not run on same computer as Gazebo, as it will overwrite 
+          the "$ROBOT/joint_state" message.
     """
     
     def __init__(self):
@@ -39,8 +40,8 @@ class JointStateAggregator(object):
         self.lock = thread.allocate_lock()
         
         # Get parameters
-        self.robot = rospy.get_param("~robot", "")
-        self.rate = rospy.get_param("~rate", 50.0)
+        self.robot = rospy.get_param("~/robot", "")
+        self.rate = rospy.get_param("~/rate", 50.0)
         
         # Setup topic names
         left_joint_state = "{}/left_arm/joint_states".format(self.robot)
@@ -57,7 +58,7 @@ class JointStateAggregator(object):
         
         # Wait for subscribed topics to publish before continuing
         rospy.sleep(5)
-        rospy.loginfo("Joint state aggragator node initialized")
+        rospy.loginfo("'joint_state_aggragator' node initialized")
         
         # Run main script
         self.main()
@@ -66,7 +67,7 @@ class JointStateAggregator(object):
         """
         Things to do on shutdown
         """
-        rospy.loginfo("Shutting down joint state node")
+        rospy.loginfo("Shutting down 'joint_state_aggragator' node")
         rospy.sleep(1)
     
     def left_joint_state_cb(self, msg):
@@ -123,3 +124,5 @@ if __name__ == "__main__":
         JointStateAggregator()
     except rospy.ROSInterruptException:
         pass
+        
+    sys.exit(0)

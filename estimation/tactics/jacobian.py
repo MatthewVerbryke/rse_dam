@@ -27,7 +27,7 @@ class DualArmJacobianSolver(object):
     The dual-arm jacobian solver object.
     """
     
-    def __init__(self, robot)
+    def __init__(self, robot, left_base, left_eef, right_base, right_eef):
         
         # Parameters
         self.robot = robot
@@ -93,7 +93,6 @@ class DualArmJacobianSolver(object):
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
-            self.fail_info("Failed to recieve the transform for {} to {}".format(origin, target))
             return [None, None]
         
     def update(self, q_left, q_right):
@@ -119,7 +118,7 @@ class DualArmJacobianSolver(object):
             trans_24 = self.lookup_frame_transform(self.right_eef, self.left_base)
             trans_23 = self.lookup_frame_transform(self.right_eef, self.left_eef)
         else:
-            return J_left, J_right, None
+            return [J_left, J_right, None], "ok"
             
         # Determine the relative Jacobian
         R_21 = trfms.quaternion_matrix(trans_21[1])
@@ -127,5 +126,5 @@ class DualArmJacobianSolver(object):
         p_23 = trans_23[0]
         J_R = self.get_relative_jacobian(J_left, J_right, R_21, R_24, p_23)
 
-        return J_left, J_right, J_R
+        return [J_left, J_right, J_R], "ok"
         
