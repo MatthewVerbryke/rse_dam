@@ -2,14 +2,14 @@
 
 """
   Publishes the Gazebo clock message from the simulation computer to 
-  another Computer
+  another computer (or series of computers).
 
-  Copyright 2018 University of Cincinnati
+  Copyright 2018-2020 University of Cincinnati
   All rights reserved. See LICENSE file at:
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit history.
-
-  TODO: improve documentation
+  
+  TODO: Test
 """
 
 
@@ -21,20 +21,24 @@ import rospy
 
 from packing import pack_time
 
-# retrive files nessecary for websocket comms
+# Retrieve Rosbridge/Websocket utilities
 file_dir = sys.path[0]
-sys.path.append(file_dir + '/../..')
+sys.path.append(file_dir + '/../../..')
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 from rss_git_lite.common import rosConnectWrapper as rC
 
 
 class SimClockPublisher():
-    """ A ROS node to publish the values of the clock t a new computer"""
+    """
+    A ROS node to publish the values of the clock to a new computer
+    """
     
     def __init__(self):
         
-        # Get inputs
-        self.connection = sys.argv[1]
+        # Handle command line arguments
+        connections = []
+        for i in range(1,len(sys.argv)):
+            connections.append(sys.argv[i])
         
         # Initialize node
         rospy.init_node("clock_publisher", anonymous=True)
@@ -51,22 +55,21 @@ class SimClockPublisher():
         # '/clock' Subscriber
         rospy.Subscriber("/clock", Clock, self.time_cb)
         
-        # Setup ROSbridge publisher
-        ws = rC.RosMsg("ws4py", self.connection, "pub", "/clock", "rosgraph_msgs/Clock", pack_time)
+        # Setup ROSbridge publisher(s)
+        self.pubs = []
+        for ip in connections:
+            self.pubs.append(rC.RosMsg("ws4py", ip, "pub", "/clock", 
+                                       "rosgraph_msgs/Clock", pack_time))
         
         # Run publisher
-        rospy.loginfo("Clock publisher initialized")
-        self.publish_clock(ws)
+        rospy.loginfo("Simulation clock publisher initialized")
+        self.main()
         
     def time_cb(self, msg):
         """
-        Callback for gazebo /clock.
+        Callback for Gazebo/clock.
         """
-        
-        # Get the current gazebo clock time
-        self.lock.acquire()
         self.clock_time = msg
-        self.lock.release()
         
     def copy_and_clear_received(self):
         """
@@ -81,31 +84,23 @@ class SimClockPublisher():
         
         return clock_current
     
-    def copy_received(self):
-        """
-        Give the value that was last received but don't clear or overwrite
-        it.
-        """
-        
-        # Send the clock time
-        self.lock.acquire()
-        clock_current = self.clock_time
-        self.lock.release()
-        
-        return clock_current
-    
-    def publish_clock(self, ws):
+    def publish_clock(self):
         """
         Retrieve and publish the clock time.
         """
         
-        # Publish the clock to the other computer only if a new clock time is recieved
         while not rospy.is_shutdown():
-            clock_current = self.copy_and_clear_received()
-            if (clock_current==None):
+            
+            # Check for new time message
+            clock_now = self.copy_and_clear_received()
+            
+            # If there is a new message publish it to all destinations
+            if (clock_now==None):
                 pass
             else:
-                ws.send(clock_current)
+                for pub in pubs:
+                    self.pub.send(clock_now)
+                    
             self.rate.sleep()
 
     def cleanup(self):
@@ -119,4 +114,9 @@ class SimClockPublisher():
 
 
 if __name__ == "__main__":
-    SimClockPublisher()
+    try:
+        SimClockPublisher()
+    except rospy.ROSInterruptException:
+        pass
+        
+    sys.exit(0)
