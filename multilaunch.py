@@ -18,7 +18,6 @@ import subprocess
 import sys 
 from time import sleep
 
-
 # include the workspace source directory
 sys.path.append(os.getcwd() + "/..") 
 from rss_git_lite.common import fileFunctions as fF
@@ -29,28 +28,6 @@ def print_instructions_to_screen():
     TODO
     """
     pass
-    
-def prepare_parameters(top_dir, robot_config_path, arm_config, cxn_config):
-    """
-    Prepare to launch relevant parameters
-    
-    TODO: make more general for other robot systems
-    """
-    
-    tab_title = []
-    command = []
-    
-    # Parameters terminal
-    tab_title.extend(["parameters"])
-    command.extend([''' source %(top_dir)s/devel/setup.bash
-                        cd %(top_dir)s/%(robot_config_path)s
-                        rosparam load %(arm_config)s.yaml
-                        rosparam load %(cxn_config)s.yaml
-                        rosparam load default.yaml
-                        exit()
-    ''' % locals()])
-    
-    return tab_title, command
     
 def prepare_rosbridge_server(top_dir):
     """
@@ -69,7 +46,7 @@ def prepare_rosbridge_server(top_dir):
     
     return tab_title, command
 
-def prepare_state_estimator(top_dir):
+def prepare_state_estimator(top_dir, param_files, param_dir):
     """
     Prepare commands to launch all state estimation module components
     """
@@ -77,24 +54,11 @@ def prepare_state_estimator(top_dir):
     tab_title = []
     command = []
     
-    # Joint State Aggagator
-    tab_title.extend(["aggragator"])
-    command.extend([''' source %(top_dir)s/devel/setup.bash
-                        cd estimator
-                        python aggagator.py
-    ''' % locals()])
-    
-    # Robot State Publisher
-    tab_title.extend(["robot_state_publisher"])
-    command.extend([''' cd utilities
-                        roslaunch robot_state.launch
-    ''' % locals()])
-    
     # State Estimator
-    tab_title.extend("state_estimation")
-    command.extend(['''
-                        cd estimator
-                        python state_estimation.py
+    tab_title.extend(["state_estimation"])
+    command.extend([''' source %(top_dir)s/devel/setup.bash
+                        cd estimation
+                        python state_estimation.py %(param_files)s %(param_dir)s
     ''' % locals()])
     
     return tab_title, command
@@ -110,13 +74,11 @@ if __name__ == "__main__":
     groups = []
     
     # Input parameters (TODO: improve)
-    robot_config_path = "/src/boxbot_ros/boxbot_bringup/config/"
-    arm_config = "arm_6dof"
-    cxn_config = "connections"
+    param_files = "arm_6dof,connections,default"
+    param_dir = "/home/matthew/catkin_ws/src/boxbot_ros/boxbot_bringup/config"
     
     # launch parameters (TODO: improve)
-    load_parameters = True
-    launch_rosbridge = True
+    launch_rosbridge = False
     launch_SEM = True
     launch_DL = False
     launch_HL = False
@@ -139,7 +101,7 @@ if __name__ == "__main__":
         
         # Get the state estimator module(s) launch information
         if launch_SEM:
-            tab_title, command = prepare_state_estimator(top_dir)
+            tab_title, command = prepare_state_estimator(top_dir, param_files, param_dir)
             groups.append((tab_title, command))
             
         # Get the reflexive layer module(s) launch information
@@ -166,7 +128,7 @@ if __name__ == "__main__":
                 ''' % (group[1][i],), '-t', '%s' % (group[0][i],)])
             #print terminal
             subprocess.call(terminal)
-            sleep(9)
+            sleep(4)
             
         print("All desired components have now been called.")
     
