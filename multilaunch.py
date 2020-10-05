@@ -30,9 +30,31 @@ def print_instructions_to_screen():
     """
     pass
     
+def prepare_parameters(top_dir, robot_config_path, arm_config, cxn_config):
+    """
+    Prepare to launch relevant parameters
+    
+    TODO: make more general for other robot systems
+    """
+    
+    tab_title = []
+    command = []
+    
+    # Parameters terminal
+    tab_title.extend(["parameters"])
+    command.extend([''' source %(top_dir)s/devel/setup.bash
+                        cd %(top_dir)s/%(robot_config_path)s
+                        rosparam load %(arm_config)s.yaml
+                        rosparam load %(cxn_config)s.yaml
+                        rosparam load default.yaml
+                        exit()
+    ''' % locals()])
+    
+    return tab_title, command
+    
 def prepare_rosbridge_server(top_dir):
     """
-    Prepare an to launch a rosbridge server
+    Prepare to launch a rosbridge server
     """
         
     tab_title = []
@@ -87,7 +109,13 @@ if __name__ == "__main__":
     # Storage for launch information
     groups = []
     
-    # Inputs (TODO)
+    # Input parameters (TODO: improve)
+    robot_config_path = "/src/boxbot_ros/boxbot_bringup/config/"
+    arm_config = "arm_6dof"
+    cxn_config = "connections"
+    
+    # launch parameters (TODO: improve)
+    load_parameters = True
     launch_rosbridge = True
     launch_SEM = True
     launch_DL = False
@@ -95,6 +123,14 @@ if __name__ == "__main__":
     launch_RL = False
     
     try:
+        
+        # Get all relevant parameters
+        if load_parameters:
+            tab_title, command = prepare_parameters(top_dir,
+                                                    robot_config_path,
+                                                    arm_config,
+                                                    cxn_config)
+            groups.append((tab_title, command))
         
         # Get the rosbridge server launch information
         if launch_rosbridge:
@@ -120,7 +156,7 @@ if __name__ == "__main__":
             
         # Launch all desired components
         for group in groups:
-            terminal = ["gnome_terminal"]
+            terminal = ["gnome-terminal"]
             for i in range(len(group[1])):
                 terminal.extend(['--tab', '-e', '''
                     bash -c '
@@ -128,7 +164,8 @@ if __name__ == "__main__":
                         read
                     '
                 ''' % (group[1][i],), '-t', '%s' % (group[0][i],)])
-            subprocess.call[terminal]
+            #print terminal
+            subprocess.call(terminal)
             sleep(9)
             
         print("All desired components have now been called.")
