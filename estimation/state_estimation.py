@@ -17,16 +17,26 @@ import os
 import sys
 import thread
 
-from diagnostic_msgs.msg import DiagnosticStatus
+from diagnostic_msgs.msg import DiagnosticStatus, DiagnosticArray
 from geometry_msgs.msg import Pose
 import numpy as np
 from sensor_msgs.msg import JointState
 import rospy
+import tf
 
-from csa_msgs.msg import CSADirective, CSAResponse
+from csa_msgs.msg import Directive, Response
 from rse_dam_msgs.msg import DualArmState
 from tactics.jacobian import DualArmJacobianSolver
 from tactics.eef_state import EndEffectorStateSolver
+
+# Retrieve modules from elsewhere in the catkin workspace
+file_dir = sys.path[0]
+sys.path.append(file_dir + "/..")
+sys.path.append(file_dir + "/../..")
+from common import params, merge
+from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
+from rss_git_lite.common import rosConnectWrapper as rC
+
 
 
 class StateEstimationModule(object):
@@ -39,16 +49,18 @@ class StateEstimationModule(object):
     def __init__(self):
         """
         Module initialization
-        
-        TODO: Test
         """
         
         # Get CWD
-        home_cwd = os.getcwd()
+        home_dir = os.getcwd()
+        
+        # Get command line arguments
+        param_files = sys.argv[1]
+        param_dir = sys.argv[2]
         
         # Initialize rospy node
         rospy.init_node("state_estimation")
-        rospy.loginfo("Node initialized")
+        rospy.loginfo("Initialized 'state_estimation' node")
         
         # Initialize cleanup for the node
         rospy.on_shutdown(self.cleanup)
@@ -56,40 +68,66 @@ class StateEstimationModule(object):
         # Get a lock
         self.lock = thread.allocate_lock()
         
-        # Setup parameters 
-        self.rate = rospy.get_param("~rate", 50.0)
-        self.robot = rospy.get_param("~robot", "")
-        self.connection = rospy.get_param("~secondary_ip", "")
-        self.ref_frame = rospy.get_param("~reference_frame", "world")
+        # Get main parameters from file
+        param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
+        self.rate = param_dict["rate"]
+        self.robot = param_dict["robot"]
+        joints = param_dict["joints"]
+        self.connections = param_dict["connections"]
+        self.global_frame = "world"
+        ref_frame = param_dict["reference_frame"]
+        self.num_joints = len(joints["arm"])
+        left_base = "left_" + param_dict["base_link"]
+        right_base = "right_" + param_dict["base_link"]
+        left_eef = "left_" + param_dict["eef_link"]
+        right_eef = "right_" + param_dict["eef_link"]
         
-        # Parse out joint information (currently assume both arms are same)
-        self.joints = []
-        for name in rospy.get_param("~joints", dict().keys()):
-            self.joints.append(name)
-        self.num_joints = len(self.joints)
+        # Get arm joint names
+        left_name = []
+        right_name = []
+        for i in range(0,self.num_joints):
+            left_name.append("left_" + joints["arm"][i])
+            right_name.append("right_" + joints["arm"][i])
+            
+        # Store arm information TODO: handle end-effector joints
+        index = [0]*self.num_joints
+        self.arms = {"left_arm": {"name": left_name,
+                                  "index": index,
+                                  "base": left_base,
+                                  "eef": left_eef},
+                     "right_arm": {"name": right_name,
+                                   "index": index,
+                                   "base": right_base,
+                                   "eef": right_eef},}
         
         # Setup variables
         self.seq_in = 0
         self.ctrl_seq = 0
         self.directives = []
         self.ctrl_directive = None
+        self.tactic = None
         self.arb_status = 0
         self.ctrl_status = 0
         self.am_status = 0
         self.new_directive = True
         self.executing = False
         
-        # Setup state storage variables
-        self.left_joint_state = JointState()
-        self.left_jacobian = np.zeros(6,self.num_joints)
-        self.left_eef_state = Pose()
-        self.right_joint_state = JointState()
-        self.right_jacobian = np.zeros(6,self.num_joints)
-        self.right_eef_state = Pose()
-        self.relative_jacobian = np.zeros(6,self.num_joints)
-        self.target_state = Pose()
-        self.left_actuator_health = DiagnosticArray()
-        self.right_actuator_health = DiagnosticArray()
+        # Inter-component communication variables
+        self.arb_to_ctrl = None
+        self.ctrl_to_tact = None
+        self.ctrl_to_am = None
+        self.tact_to_ctrl = None
+        self.am_to_ctrl = None
+        
+        # Setup initial directive for the module to follow
+        self.up_msg = Directive()
+        self.up_msg.action = "default"
+        
+        # Initialize the state storage variable        
+        self.state = DualArmState()
+        self.state.left_jacobian = np.zeros((6*self.num_joints))
+        self.state.right_jacobian = np.zeros((6*self.num_joints))
+        self.state.rel_jacobian = np.zeros((6*self.num_joints))
         
         # Initialize communications
         self.init_comms()
@@ -102,8 +140,9 @@ class StateEstimationModule(object):
         """
         Function to cleanly stop module on shutdown command.
         """
+        
         rospy.sleep(1)
-        rospy.loginfo("Shutting down state_estimation module")
+        rospy.loginfo("Shutting down 'state_estimation' node")
         
     #==== COMMUNICATIONS ==============================================#
         
@@ -126,7 +165,7 @@ class StateEstimationModule(object):
         # Setup ROS Publishers
         self.robot_state_pub = rospy.Publisher(robot_state, DualArmState,
                                                queue_size=1)
-        self.response_pub = rospy.Publisher(response, CSAResponse,
+        self.response_pub = rospy.Publisher(response, Response,
                                             queue_size=1)
         
         # Setup ROS Subscribers
@@ -136,7 +175,7 @@ class StateEstimationModule(object):
         self.right_joint_sub = rospy.Subscriber(right_joint_state,
                                                 JointState,
                                                 self.right_joint_state_cb)
-        self.directive_sub = rospy.Subscriber(directive, CSADirective,
+        self.directive_sub = rospy.Subscriber(directive, Directive,
                                               self.directive_cb)
         
     def build_state_message(self, ctrl_out):
@@ -186,16 +225,42 @@ class StateEstimationModule(object):
         
     def left_joint_state_cb(self, msg):
         """
-        Callback function for left arm joint state messages
-        """
-        self.left_joint_state = msg
+        Callback function for the left-arm joint state message
         
+        TODO: Test
+        """
+        
+        # Check the index of each joint in joint state
+        for i in range(0,self.num_joints):
+            name = self.arms["left_arm"]["name"][i]
+            idx = self.arms["left_arm"]["index"][i]
+            if msg.name[idx] == name:
+                pass
+            else:
+                self.arms["left_arm"]["index"][i] = msg.name.index(name)
+        
+        # Write the message to the state varibale
+        self.state.left_joint_state = msg
+
     def right_joint_state_cb(self, msg):
         """
-        Callback function for right arm joint state messages
+        Callback function for the right-arm joint state message
+        
+        TODO: Test
         """
-        self.right_joint_state = msg
-
+        
+        # Check the index of each joint in joint state
+        for i in range(0,self.num_joints):
+            name = self.arms["right_arm"]["name"][i]
+            idx = self.arms["right_arm"]["index"][i]
+            if msg.name[idx] == name:
+                pass
+            else:
+                self.arms["right_arm"]["index"][i] = msg.name.index(name)
+        
+        # Write the message to the state varibale
+        self.state.right_joint_state = msg
+    
     def directive_cb(self, msg):
         """
         Callback function for directives sent from the deliberative
@@ -220,9 +285,8 @@ class StateEstimationModule(object):
     def main(self):
         """
         Main execution loop for the module.
-        
-        TODO: Test
         """
+        
         r = rospy.Rate(self.rate)
         while not rospy.is_shutdown():
             self.lock.acquire()
@@ -233,24 +297,16 @@ class StateEstimationModule(object):
     def run_components(self):
         """
         Perform one update cycle of the each module component.
-        
-        TODO: Test
         """
         
-        # Get a lock
-        self.lock.acquire()
-        
-        try:
-            
-            # Run each of the CSA components
-            self.arb_to_ctrl = self.arbitration(self.ctrl_status)
-            self.ctrl_to_am, self.ctrl_to_tact = self.control(self.arb_to_ctrl,
-                                                              self.tact_to_ctrl)
-            self.tact_to_ctrl = self.tactics(self.ctrl_to_tact)
-            self.am_to_ctrl = self.activity_manager(self.ctrl_to_am)
-        
-        # Release the lock
-        self.lock.release()
+        print self.arb_status
+        print self.ctrl_status
+        print ""
+        self.arb_to_ctrl = self.arbitration(self.ctrl_status)
+        self.ctrl_to_am, self.ctrl_to_tact = self.control(self.arb_to_ctrl,
+                                                          self.tact_to_ctrl)
+        self.tact_to_ctrl = self.tactics(self.ctrl_to_tact)
+        self.am_to_ctrl = self.activity_manager(self.ctrl_to_am)
         
     #==== CSA SUBMODULES ==============================================#
         
@@ -271,8 +327,9 @@ class StateEstimationModule(object):
         
         # Standby
         if self.arb_status == 0:
-            if new_directive:
+            if self.new_directive:
                 self.directives.append(self.up_msg)
+                self.up_msg = None
                 self.arb_status = 1
             else:
                 pass
@@ -282,7 +339,7 @@ class StateEstimationModule(object):
             if len(self.directives) == 0:
                 self.arb_status = 0
             else:
-                merge_result = priority_merge(self.directives)# <----- TODO: FILL IN FUNCTION NAME
+                merge_result = merge.dumb_merge(self.directives)
                 merged_directive = merge_result[0]
                 self.directives = merge_result[1]
                 if merged_directive != None:
@@ -293,11 +350,11 @@ class StateEstimationModule(object):
         
         # Wait for execution of merged directive
         elif self.arb_status == 2:
-            if ctrl_status = 1 or ctrl_status = 2:
+            if ctrl_status == 1 or ctrl_status == 2:
                 pass
-            elif ctrl_status = 3:
+            elif ctrl_status == 3:
                 self.arb_status = 3
-            elif ctrl_status = 4:
+            elif ctrl_status == 4:
                 self.arb_status = 4                
         
         # Report successful execution of directive
@@ -305,14 +362,14 @@ class StateEstimationModule(object):
             response_msg = self.build_response()
             for i in range(0,5):
                 response_pub.publish(response_msg)
-            self.arb_status == 1
+            self.arb_status = 1
         
         # Report a failure in executing the directive
         elif self.arb_status == 4:
             response_msg = self.build_response()
             for i in range(0,5):
                 response_pub.publish(response_msg)
-            self.arb_status == 1
+            self.arb_status = 1
             
         return merged_directive
         
@@ -348,8 +405,9 @@ class StateEstimationModule(object):
         # Execution
         elif self.ctrl_status == 2:
             ctrl_out = []
-            for tact in self.tactic
-                result, status = tact.update()
+            for tact in self.tactic:
+                result, status = tact.update(self.left_joint_state,
+                                             self.right_joint_state)
                 if status == "fail":
                     self.ctrl_status = 4
                 elif status == "ok":
@@ -376,19 +434,22 @@ class StateEstimationModule(object):
         TODO: Test
         """
         
-        if tactic_request == "default":
-            jacobian_solver = DualArmJacobianSolver(self.robot,
-                                                    self.left_base,
-                                                    self.left_eef,
-                                                    self.right_base,
-                                                    self.right_eef)
-            eef_state_solver = EndEffectorStateSolver(self.robot,
-                                                      self.base_frame,
-                                                      self.left_eef,
-                                                      self.right_eef)
-            tactic = [jacobian_solver, eef_state_solver]
+        # If there actually is a tactic request...
+        if tactic_request != None:
             
-        return tactic
+            # Publish default state data
+            if tactic_request.action == "default":
+                jacobian_solver = DualArmJacobianSolver(self.robot,
+                                                        self.joints,
+                                                        self.frames)
+                eef_state_solver = EndEffectorStateSolver(self.robot,
+                                                          self.frames)
+                tactic = [jacobian_solver, eef_state_solver]
+            
+            return tactic
+            
+        else:
+            return None
         
     def activity_manager(self, ctrl_out):
         """
@@ -398,11 +459,16 @@ class StateEstimationModule(object):
         TODO: Test
         """
         
-        # Build a dual arm state message
-        msg = self.build_state_message(ctrl_out)
-        
-        # Publish state information
-        self.robot_state_pub.publish(msg)
+        # Only publish if there is a message
+        if ctrl_out != None:
+            
+            # Build a dual arm state message
+            msg = self.build_state_message(ctrl_out)
+            
+            # Publish state information
+            self.robot_state_pub.publish(msg)
+
+        return None
         
     #==== OTHER FUNCTIONS =============================================#
     
@@ -414,16 +480,16 @@ class StateEstimationModule(object):
         TODO: Test
         """
         
-        self.left_jacobian = results[0]
-        self.right_jacobian = results[1]
-        self.relative_jacobian = results[2]
-        self.left_eef_state = results[3]
-        self.right_eef_state = results[4]
-
+        if results != None:
+            self.left_jacobian = results[0]
+            self.right_jacobian = results[1]
+            self.relative_jacobian = results[2]
+            self.left_eef_state = results[3]
+            self.right_eef_state = results[4]
 
 if __name__ == "__main__":
     try:
-        module_node = StateEstimationModule()
+        StateEstimationModule()
     except rospy.ROSInterruptException:
         pass
         

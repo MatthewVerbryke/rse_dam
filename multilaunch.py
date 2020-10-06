@@ -86,14 +86,6 @@ if __name__ == "__main__":
     
     try:
         
-        # Get all relevant parameters
-        if load_parameters:
-            tab_title, command = prepare_parameters(top_dir,
-                                                    robot_config_path,
-                                                    arm_config,
-                                                    cxn_config)
-            groups.append((tab_title, command))
-        
         # Get the rosbridge server launch information
         if launch_rosbridge:
             tab_title, command = prepare_rosbridge_server(top_dir)
@@ -128,7 +120,7 @@ if __name__ == "__main__":
                 ''' % (group[1][i],), '-t', '%s' % (group[0][i],)])
             #print terminal
             subprocess.call(terminal)
-            sleep(4)
+            sleep(3)
             
         print("All desired components have now been called.")
     
