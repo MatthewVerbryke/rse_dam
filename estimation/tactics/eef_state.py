@@ -25,14 +25,16 @@ class EndEffectorStateSolver(object):
     A dual-arm end-effector state solver object
     """
     
-    def __init__(self, robot, base_frame, left_eef, right_eef):
+    def __init__(self, robot, arms):
         
         # Parameters
         self.robot = robot
-        self.base_frame = base_frame
-        self.left_eef = left_eef
-        self.right_eef = right_eef
-        
+        self.base_frame = ""
+        self.left_base = arms["left_arm"]["base"]
+        self.left_eef = arms["left_arm"]["eef"]
+        self.right_base = arms["right_arm"]["base"]
+        self.right_eef = arms["right_arm"]["eef"]
+
         # Create a TF listener
         self.listener = tf.TransformListener()
     
@@ -44,13 +46,14 @@ class EndEffectorStateSolver(object):
         
         # Try to get the info on the frames from tf if given a link name
         try:
+            self.listener.waitForTransform(target, origin, rospy.Time(0), rospy.Duration(4.0))
             trans, rot = self.listener.lookupTransform(target, origin, rospy.Time(0))
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
             return [None, None]
     
-    def update(self):
+    def update(self, joint_state):
         """
         Update the function when called from the main script.
         """
