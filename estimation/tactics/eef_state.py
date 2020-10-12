@@ -29,7 +29,7 @@ class EndEffectorStateSolver(object):
         
         # Parameters
         self.robot = robot
-        self.base_frame = ""
+        self.base_frame = "torso" #<-- TODO: change this to be more general
         self.left_base = arms["left_arm"]["base"]
         self.left_eef = arms["left_arm"]["eef"]
         self.right_base = arms["right_arm"]["base"]
@@ -53,6 +53,23 @@ class EndEffectorStateSolver(object):
             rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
             return [None, None]
     
+    def tf_transform_to_pose(self, transform):
+        """
+        Given a transform from 'tf/TransformListener' convert it into a
+        'geometry_msgs/Pose' message.
+        """
+        
+        pose = Pose()
+        pose.position.x = transform[0][0]
+        pose.position.y = transform[0][1]
+        pose.position.z = transform[0][2]
+        pose.orientation.x = transform[1][0]
+        pose.orientation.y = transform[1][1]
+        pose.orientation.z = transform[1][2]
+        pose.orientation.w = transform[1][3]
+        
+        return pose
+    
     def update(self, joint_state):
         """
         Update the function when called from the main script.
@@ -63,11 +80,7 @@ class EndEffectorStateSolver(object):
         trans_right_eef = self.lookup_frame_transform(self.base_frame, self.right_eef)
         
         # Package the transforms as geometry_msgs/Pose
-        left_eef_pose = Pose()
-        left_eef_pose.position = trans_left_eef[0]
-        left_eef_pose.orientation = trans_left_eef[1]
-        right_eef_pose = Pose()
-        right_eef_pose.position = trans_right_eef[0]
-        right_eef_pose.orientation = trans_right_eef[1]
+        left_eef_pose = self.tf_transform_to_pose(trans_left_eef)
+        right_eef_pose = self.tf_transform_to_pose(trans_right_eef)
         
         return [left_eef_pose, right_eef_pose], "ok"

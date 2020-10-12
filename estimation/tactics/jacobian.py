@@ -46,7 +46,6 @@ class DualArmJacobianSolver(object):
         self.listener = tf.TransformListener()
         
     def get_relative_jacobian(self, J_A, J_B, R_21, R_24, p_23):
-    def get_relative_jacobian(J_A, J_B, T_21, T_24, p_23):
         """
         Get the Relative jacobian matrix of the dual-arm setup. Which 
         arm is currently the "master" arm is not handled inside this
@@ -76,12 +75,12 @@ class DualArmJacobianSolver(object):
         psi_23[0:3,3:6] = p_23_skew_sym
         
         omega_21 = np.zeros((6,6))
-        omega_21[0:3,0:3] = T_21[0:3,0:3]
-        omega_21[3:6,3:6] = T_21[0:3,0:3]
+        omega_21[0:3,0:3] = R_21[0:3,0:3]
+        omega_21[3:6,3:6] = R_21[0:3,0:3]
         
         omega_24 = np.zeros((6,6))
-        omega_24[0:3,0:3] = T_24[0:3,0:3]
-        omega_24[3:6,3:6] = T_24[0:3,0:3]
+        omega_24[0:3,0:3] = R_24[0:3,0:3]
+        omega_24[3:6,3:6] = R_24[0:3,0:3]
         
         # Calculate the relative Jacobian
         psi_23_omega_21 = np.multiply(psi_23, omega_21)
@@ -100,7 +99,6 @@ class DualArmJacobianSolver(object):
         try:
             self.listener.waitForTransform(target, origin, rospy.Time(0), rospy.Duration(4.0))
             trans, rot = self.listener.lookupTransform(target, origin, rospy.Time(0))
-            print trans, rot
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
