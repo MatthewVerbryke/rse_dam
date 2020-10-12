@@ -49,6 +49,8 @@ add_message_files(
    HLtoDL.msg
    OptoDL.msg
    DLtoOp.msg
+   HLtoRL.msg
+   RLtoHL.msg
    DualArmState.msg
  )
 

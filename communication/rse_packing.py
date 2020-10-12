@@ -13,7 +13,7 @@
 
 import sys
 
-from packing import pack_robottrajectory, pack_pose, pack_posearray, pack_string, pack_posestamped
+from packing import pack_robottrajectory, pack_pose, pack_posearray, pack_string, pack_posestamped, pack_jointstate
 
 
 def pack_HL_to_DL(hltodl):
@@ -60,3 +60,29 @@ def pack_DL_to_HL(dltohl):
     
     return dltohl_msg
     
+def pack_dual_arm_state(DAS):
+    """
+    
+    """   
+    
+    # Prepare message info
+    header = pack_header(DAS.header)
+    left_js = pack_jointstate(DAS.left_joint_state)
+    left_eef = pack_pose(DAS.left_eef_state)
+    left_J = DAS.left_jacobian
+    right_js = pack_jointstate(DAS.right_joint_state)
+    right_eef = pack_pose(DAS.right_eef_state)
+    right_J = DAS.right_jacobian
+    rel_J = DAS.rel_jacobian
+    
+    # Package message data
+    DAS_msg = {"header": header,
+               "left_joint_state": left_js,
+               "left_jacobian": left_J,
+               "left_eef_state": left_eef,
+               "right_joint_state": right_js,
+               "right_jacobian": right_J,
+               "right_eef_state": right_eef,
+               "rel_jacobian": rel_J}
+               
+    return DAS_msg
