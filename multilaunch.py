@@ -46,13 +46,20 @@ def prepare_rosbridge_server(top_dir):
     
     return tab_title, command
 
-def prepare_state_estimator(top_dir, param_files, param_dir):
+def prepare_state_estimator(robot, top_dir, param_files, param_dir, launch_dir):
     """
     Prepare commands to launch all state estimation module components
     """
     
     tab_title = []
     command = []
+    
+    # Robot dependent nodes for pulling state information together
+    tab_title.extend(["state_estimation_support"])
+    command.extend([''' source %(top_dir)s/devel/setup.bash
+                        cd ..
+                        roslaunch %(robot)s_bringup %(robot)s_state.launch
+    ''' % locals()])
     
     # State Estimator
     tab_title.extend(["state_estimation"])
@@ -62,7 +69,22 @@ def prepare_state_estimator(top_dir, param_files, param_dir):
     ''' % locals()])
     
     return tab_title, command
-
+    
+def prepare_reflexive_layer(robot, side, sim, top_dir, param_files, param_dir, launch_dir):
+    """
+    
+    """
+    
+    tabtitle = []
+    command = []
+    
+    tabtitle.extend(["reflexive_module"])
+    command.extend([''' source %(top_dir)s/devel/setup.bash
+                        cd reflexive
+                        python reflexive.py %(param_files)s %(param_dir)s %(side)s
+    ''' % locals()])
+    
+    return tabtitle, command
 
 if __name__ == "__main__":
     
@@ -73,16 +95,21 @@ if __name__ == "__main__":
     # Storage for launch information
     groups = []
     
-    # Input parameters (TODO: improve)
+    # Input parameters (TODO: set in stone currently, improve)
+    robot_name = "boxbot"
+    sim = "true"
+    side = "left"
     param_files = "arm_6dof,connections,default"
-    param_dir = "/home/matthew/catkin_ws/src/boxbot_ros/boxbot_bringup/config"
+    bringup_dir = "/home/matthew/catkin_ws/src/boxbot_ros/boxbot_bringup/"
+    param_dir = bringup_dir + "config"
+    launch_dir = bringup_dir + "launch"
     
     # launch parameters (TODO: improve)
     launch_rosbridge = False
-    launch_SEM = True
+    launch_SEM = False
     launch_DL = False
     launch_HL = False
-    launch_RL = False
+    launch_RL = True
     
     try:
         
@@ -93,12 +120,23 @@ if __name__ == "__main__":
         
         # Get the state estimator module(s) launch information
         if launch_SEM:
-            tab_title, command = prepare_state_estimator(top_dir, param_files, param_dir)
+            tab_title, command = prepare_state_estimator(robot_name,
+                                                         top_dir,
+                                                         param_files,
+                                                         param_dir,
+                                                         launch_dir)
             groups.append((tab_title, command))
             
         # Get the reflexive layer module(s) launch information
         if launch_RL:
-            pass #TODO
+            tab_title, command = prepare_reflexive_layer(robot_name,
+                                                         side, 
+                                                         sim,
+                                                         top_dir,
+                                                         param_files,
+                                                         param_dir,
+                                                         launch_dir)
+            groups.append((tab_title, command))
         
         # Get the habitual layer module(s) launch information
         if launch_HL:
@@ -131,4 +169,3 @@ if __name__ == "__main__":
         except NameError:
             print("Name Error")
         sleep(3)
-

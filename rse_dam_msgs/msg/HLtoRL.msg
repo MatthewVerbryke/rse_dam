@@ -1,3 +1,6 @@
+# Is there a new command we are sending through?
+bool new_command
+
 # Type of controller to use
 # - 1 = follow controller
 # - 2 = relative jacobian controller (master)

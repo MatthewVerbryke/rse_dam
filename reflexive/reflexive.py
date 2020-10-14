@@ -2,8 +2,7 @@
 
 
 """
-  Arbotix microcontroller based reflexive layer module for one robotic 
-  arm.
+  Reflexive layer module for one robotic arm in a dual arm setup.
 
   Copyright 2020 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -12,21 +11,34 @@
   history.
   
   TODO: Test pretty much everything
+  TODO: Improve documentation
 """
 
 
+import copy
 import os
 import serial
 import sys
 import thread
 import time
 
-import rospy
 from diagnostic_msgs.msg import DiagnosticArray
+from geometry_msgs.msg import Pose
+import numpy as np
+import rospy
 from sensor_msgs.msg import JointState
-from trajectory_msgs.msg import JointTrajectory
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from csa_msgs.msg import CSADirective, CSAResponse
+from rse_dam_msgs.msg import HLtoRL, RLtoHL, DualArmState
+from tactics.follow_controller import FollowController
+from tactics.relative_jacobian import RelativeJacobianController
+
+# Retrieve modules from elsewhere in the catkin workspace
+file_dir = sys.path[0]
+sys.path.append(file_dir + "/..")
+sys.path.append(file_dir + "/../..")
+from common import params
+from csa_msgs.msg import TimedPoseArray
 
 
 class ReflexiveModule(object):
@@ -44,23 +56,43 @@ class ReflexiveModule(object):
         # Get CWD
         home_cwd = os.getcwd()
         
-        # Command line inputs
-        #TODO
-        
-        # Retrieve parameters 
-        self.rate = rospy.get_param("~rate", 100.0)
-        self.side = rospy.get_param("~side", "")
-        self.robot = rospy.get_param("~robot", "")
-        
-        # Setup variables
-        self.directives = []
-        self.status = ""
-        self.description = ""
-        self.seq_count = 0
+        # Get command line arguments
+        param_files = sys.argv[1]
+        param_dir = sys.argv[2]
+        self.side = sys.argv[3]
         
         # Initialize rospy node
-        rospy.init_node("{}_reflexive_module".format(self.side))
-        rospy.loginfo("Node initialized")
+        self.node_name = "{}_reflexive_module".format(self.side)
+        rospy.init_node(self.node_name)
+        rospy.loginfo("'{}' node initialized".format(self.node_name))
+        
+        # Get main parameters from file
+        self.global_frame = "world"
+        param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
+        self.rate = param_dict["rate"]
+        self.robot = param_dict["robot"]
+        self.connections = param_dict["connections"]
+        self.local_ip = self.connections["{}_arm".format(self.side)]
+        ref_frame = param_dict["reference_frame"]
+        joints = param_dict["joints"]
+        
+        # Get full joint names
+        self.arm_joints = ["{}_{}".format(self.side, joint) for joint in joints["arm"]]
+        self.eef_joints = ["{}_{}".format(self.side, joint) for joint in joints["eef"]]
+        
+        # State variables
+        self.joint_state = JointState()
+        self.jacobian = np.zeros((6,len(self.arm_joints)))
+        self.rel_jacobian = np.zeros((6,2*len(self.arm_joints)))
+        self.eef_pose = Pose()
+        
+        # Control parameters
+        self.control_type = None
+        self.poses = TimedPoseArray()
+        self.trajectory = JointTrajectory()
+        self.new_command = False
+        self.state = "start"
+        self.status = 0
         
         # Initialize cleanup for the node
         rospy.on_shutdown(self.cleanup)
@@ -72,15 +104,15 @@ class ReflexiveModule(object):
         self.init_comms()
         rospy.loginfo("Communcation interfaces setup")
         
-        # Start state machine
+        # Run the module
         self.run_state_machine()
-
+    
     def run_state_machine(self):
         """
         Main execution loop for the module.
         """
         
-        r = rospy.Rate(self.rate)
+        r = rospy.Rate(50.0)
         while not rospy.is_shutdown():
             self.state_machine()
             r.sleep()
@@ -90,13 +122,9 @@ class ReflexiveModule(object):
         Function to cleanly stop module on shutdown command.
         """
         
-        # Shutdown controllers
-        for controller in self.controllers:
-            controller.shutdown()
-        
         # Shutdown node
         rospy.sleep(1)
-        rospy.loginfo("Shutting down node")
+        rospy.loginfo("Shutting down '{}' node".format(self.node_name))
         
     #==== COMMUNICATIONS ==============================================#
         
@@ -107,45 +135,113 @@ class ReflexiveModule(object):
         """
         
         # Message topic names
-        response_name = "{}/{}_arm/RL_response".format(self.robot,
-                                                       self.side)
-        directive_name = "{}/{}_arm/HL_directive".format(self.robot, 
-                                                         self.side)
+        RLtoHL_name = "{}/{}_arm/RLtoHL".format(self.robot,
+                                                  self.side)
+        HLtoRL_name = "{}/{}_arm/HLtoRL".format(self.robot, 
+                                                  self.side)
+        state_name = "{}/state_estimate".format(self.robot)
+        command_name = "{}/{}_arm/command".format(self.robot,
+                                                  self.side)
         
         # Setup ROS Publishers
-        self.response_pub = rospy.Publisher(response_name, CSAResponse,
-                                            queue_size=1)
+        self.RLtoHL_pub = rospy.Publisher(RLtoHL_name,
+                                          RLtoHL,
+                                          queue_size=1)
+        self.command_pub = rospy.Publisher(command_name,
+                                           JointTrajectoryPoint,
+                                           queue_size=1)
         
         # Setup ROS Subscribers
-        self.directive_sub = rospy.Subscriber(directive_name, CSADirective,
-                                              self.directive_cb)
-        
-    def build_response(self):
+        self.HLtoRL_sub = rospy.Subscriber(HLtoRL_name,
+                                           HLtoRL,
+                                           self.HLtoRL_cb)
+        self.state_sub = rospy.Subscriber(state_name,
+                                          DualArmState,
+                                          self.state_cb)
+                                          
+    def build_RLtoHL_msg(self):
         """
-        Build a CSA response message
+        Build a message to respond to the habitual layer.
         """
         
-        # Create the response message
-        msg = CSAResponse()
-        
-        # Fill out message
-        msg.header.seq = self.seq_count
-        msg.header.stamp = rospy.Time.now()
+        msg = RLtoHL()
         msg.status = self.status
-        msg.response = self.description
         
-    def directive_cb(self, msg):
+        return msg
+        
+    def build_command_msg(self, command):
         """
-        Callback function for directives sent from the habitual message.
+        Build a joint command message to send to the robot interface.
+        
+        TODO: make input more general to work with wider variety of
+        controllers/hardware.
         """
         
-        # Only store directive if it has new sequence number
-        new_seq = msg.header.seq
-        if new_seq == self.seq_count:
-            pass
-        else:
-            self.directives.append(msg)
+        msg = JointTrajectoryPoint()
+        msg.positions = command
+        msg.time_from_start = rospy.Time(0)
         
+        return msg
+                                          
+    def HLtoRL_cb(self, msg):
+        """
+        Callback function for command sent from the habitual layer.
+        """
+        
+        # Acquire lock
+        self.lock.acquire()
+        
+        try:
+            
+            # Extract control info
+            self.new_command = bool(msg.new_command)
+            self.control_type = msg.ctrl_type
+            self.poses = msg.poses
+            self.trajectory = msg.trajectory
+        
+        finally:
+            
+            # Release lock
+            self.lock.release()
+        
+    def state_cb(self, msg):
+        """
+        Callback function for arm state from the state estimator.
+        """
+        
+        # Acquire lock
+        self.lock.acquire()
+        
+        try:
+            
+            # Extract state info
+            if self.side == "left":
+                self.joint_state = msg.left_joint_state
+                self.jacobian = msg.left_jacobian
+                self.other_jacobian = msg.right_jacobian
+                self.eef_state = msg.left_eef_state
+                self.other_eef_state = msg.right_eef_state
+            elif self.side == "right":
+                self.joint_state = msg.right_joint_state
+                self.jacobian = msg.right_jacobian
+                self.other_jacobian = msg.left_jacobian
+                self.eef_state = msg.right_eef_state
+                self.other_eef_state = msg.left_eef_state
+            self.rel_jacobian = msg.rel_jacobian
+            
+            # 'Package' state information
+            self.arm_state = [self.joint_state,
+                              self.jacobian,
+                              self.other_jacobian,
+                              self.eef_state,
+                              self.other_eef_state,
+                              self.rel_jacobian]
+            
+        finally:
+            
+            # Release lock
+            self.lock.release()       
+    
     #==== STATE MACHINE ===============================================#
         
     def state_machine(self):
@@ -153,52 +249,83 @@ class ReflexiveModule(object):
         Perform one update cycle of the module state machine.
         """
         
-        pass
+        # Wait for new command from HL
+        if self.state == "start":
+            self.state = "standby"
+        elif self.state == "standby":
+            new_command = self.wait_for_command()
+            if new_command:
+                self.state = "setup_controller"
         
-    #==== CSA SUBMODULES ==============================================#
+        # give the controller with informaton on task
+        elif self.state == "setup_controller":
+            self.controller = self.setup_controller()
+            self.state = "execute"
         
-    def arbitration(self):
+        # Execute the trajectory
+        elif self.state == "execute":
+            command, status = self.controller.update(self.arm_state)
+            if status == 0:
+                pass
+            elif status == 1:
+                self.status = 1
+                self.command_pub.publish(cmd_msg)
+            elif status == 2:
+                self.status = 2
+                self.command_pub.publish(cmd_msg)
+                self.state = "reset"
+            
+            rltohl_msg = build_RLtoHL_msg()
+            self.RLtoHL_pub.publish(rltohl_msg)
+            
+        # Reset module
+        elif self.state == "reset":
+            self.controller = None
+            self.status = 0
+            self.state == "standby"
+            
+    #==== Module Behaviors ============================================#
+            
+    def setup_controller(self):
         """
-        Manages the overall behavior of the module: 
-            - Comuputes a "merged directive" from all directives recieved 
-              from commanding module(s)
-            - Issues merged directive to send to the control component
-            - Reports status (accept, reject, complete, error,...) to the
-              commanding module(s)
+        Determine which kind of controller to initilize and feed task 
+        setup information.
         """
         
-        pass
+        # Setup follow controller
+        if self.ctrl_type == 1:
+            controller = FollowController(self.joints, 
+                                          self.rate)
+            controller.input_new_trajectory(self.poses)
+            
+        # Setup relative Jacobian controller with this arm as master
+        elif self.ctrl_type == 2:
+            controller = RelativeJacobianController(self.joints, 
+                                                    self.rate)
+            controller.check_new_trajectory(self.trajectory, True)
+            
+        # Setup relative Jacobian controller with this arm as slave
+        elif self.ctrl_type == 3:
+            controller = RelativeJacobianController(self.joints, 
+                                                    self.rate)
+            controller.check_new_trajectory(self.trajectory, False)
+            
+        return controller
         
-    def control(self):
+    def wait_for_command(self):
         """
-        Performs overall function of the module:
-            - Computes output directive(s) for commanded modules based on
-              directive recieved from the arbitration component
-            - Reports success/failure of the directive to the arbitration
-              component
+        Wait for the HL to send down a new goal.
         """
         
-        pass
+        if self.new_command == True:
+            return True
+        else:
+            return False
         
-    def tactics(self):
-        """
-        Generates a control tactic for control to use based on the merged
-        directive.
-        """
         
-        pass
-        
-    def activity_manager(self):
-        """
-        Handles communication with commanded modules.
-        """
-        
-        pass
-        
-
 if __name__ == "__main__":
     try:
-        module_node = ArbotiXReflexiveModule()
+        ReflexiveModule()
     except rospy.ROSInterruptException:
         pass
         

@@ -132,6 +132,10 @@ class PsuedoStateEstimationModule(object):
         Main execution loop for the module.
         """
         
+        # Log that we are starting
+        rospy.loginfo("Beginning to publish robot state")
+        
+        # Main loop
         r = rospy.Rate(50.0)
         while not rospy.is_shutdown():
             self.state_machine()
@@ -190,13 +194,11 @@ class PsuedoStateEstimationModule(object):
                 self.pubs.append(new_ws_pub)
                 
         # Display communication information to terminal
-        rospy.loginfo("{} rosbridge publishers initialized".format(len(self.pubs)))
+        rospy.loginfo("{} rosbridge publishers".format(len(self.pubs)))
         
     def build_state_message(self, ctrl_out):
         """
         Build a dual arm robot state message
-        
-        TODO: Test
         """
         
         # Convert jacobians from numpy array to 1-D python lists
@@ -222,40 +224,56 @@ class PsuedoStateEstimationModule(object):
     def left_joint_state_cb(self, msg):
         """
         Callback function for the left-arm joint state message
-        
-        TODO: Test
         """
         
-        # Check the index of each joint in joint state
-        for i in range(0,self.num_joints):
-            name = self.arms["left_arm"]["name"][i]
-            idx = self.arms["left_arm"]["index"][i]
-            if msg.name[idx] == name:
-                pass
-            else:
-                self.arms["left_arm"]["index"][i] = msg.name.index(name)
+        # Acquire lock
+        self.lock.acquire()
         
-        # Write the message to the state varibale
-        self.state.left_joint_state = msg
+        try:
+        
+            # Check the index of each joint in joint state
+            for i in range(0,self.num_joints):
+                name = self.arms["left_arm"]["name"][i]
+                idx = self.arms["left_arm"]["index"][i]
+                if msg.name[idx] == name:
+                    pass
+                else:
+                    self.arms["left_arm"]["index"][i] = msg.name.index(name)
+            
+            # Write the message to the state varibale
+            self.state.left_joint_state = msg
+            
+        finally:
+            
+            # Release lock
+            self.lock.release()
 
     def right_joint_state_cb(self, msg):
         """
         Callback function for the right-arm joint state message
-        
-        TODO: Test
         """
         
-        # Check the index of each joint in joint state
-        for i in range(0,self.num_joints):
-            name = self.arms["right_arm"]["name"][i]
-            idx = self.arms["right_arm"]["index"][i]
-            if msg.name[idx] == name:
-                pass
-            else:
-                self.arms["right_arm"]["index"][i] = msg.name.index(name)
+        # Acquire lock
+        self.lock.acquire()
         
-        # Write the message to the state varibale
-        self.state.right_joint_state = msg
+        try:        
+        
+            # Check the index of each joint in joint state
+            for i in range(0,self.num_joints):
+                name = self.arms["right_arm"]["name"][i]
+                idx = self.arms["right_arm"]["index"][i]
+                if msg.name[idx] == name:
+                    pass
+                else:
+                    self.arms["right_arm"]["index"][i] = msg.name.index(name)
+            
+            # Write the message to the state varibale
+            self.state.right_joint_state = msg
+        
+        finally:
+            
+            # Release lock
+            self.lock.release()
     
     #==== STATE MACHINE ===============================================#
         
@@ -263,9 +281,6 @@ class PsuedoStateEstimationModule(object):
         """
         Perform one update cycle of the module state machine.
         """
-        
-        # Log that we are starting
-        rospy.loginfo("Beginning to publish robot state")
         
         # Update Solvers
         jacobians, j_status = self.jacobian_solver.update(self.state)
