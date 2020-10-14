@@ -68,24 +68,24 @@ class DualArmJacobianSolver(object):
         
         # Build required matricies for equation
         p_23_skew_sym = np.array([[0., -p_23[2], p_23[1]],
-                                 [p_23[0], 0., -p_23[0]],
+                                 [p_23[2], 0., -p_23[0]],
                                  [-p_23[1], p_23[0], 0.]])
         
         psi_23 = np.identity(6)
         psi_23[0:3,3:6] = p_23_skew_sym
         
         omega_21 = np.zeros((6,6))
-        omega_21[0:3,0:3] = R_21[0:3,0:3]
-        omega_21[3:6,3:6] = R_21[0:3,0:3]
+        omega_21[0:3,0:3] = R_21
+        omega_21[3:6,3:6] = R_21
         
         omega_24 = np.zeros((6,6))
-        omega_24[0:3,0:3] = R_24[0:3,0:3]
-        omega_24[3:6,3:6] = R_24[0:3,0:3]
+        omega_24[0:3,0:3] = R_24
+        omega_24[3:6,3:6] = R_24
         
         # Calculate the relative Jacobian
-        psi_23_omega_21 = np.multiply(psi_23, omega_21)
-        J_R_left = -np.multiply(psi_23_omega_21, J_A)
-        J_R_right = np.multiply(omega_24, J_B)
+        psi_23_omega_21 = np.matmul(psi_23, omega_21)
+        J_R_left = -np.matmul(psi_23_omega_21, J_A)
+        J_R_right = np.matmul(omega_24, J_B)
         J_R = np.hstack((J_R_left, J_R_right))
         
         return J_R
@@ -140,6 +140,6 @@ class DualArmJacobianSolver(object):
         R_21 = trfms.quaternion_matrix(trans_21[1])
         R_24 = trfms.quaternion_matrix(trans_24[1])
         p_23 = trans_23[0]
-        J_R = self.get_relative_jacobian(J_left, J_right, R_21, R_24, p_23)
+        J_R = self.get_relative_jacobian(J_A, J_B, R_21, R_24, p_23)
 
         return [J_left, J_right, J_R], "ok"

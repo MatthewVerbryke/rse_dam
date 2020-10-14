@@ -57,7 +57,7 @@ def solve_boxbot_6dof(q):
     J[4,5] = (sin(q1)*cos(q2) + sin(q2)*cos(q1))*sin(q3)
     J[5,5] = (sin(q1)*sin(q2) - cos(q1)*cos(q2))*cos(q4) - (sin(q1)*cos(q2) + sin(q2)*cos(q1))*sin(q4)*cos(q3)
     
-    J_t = J.transpose()
+    J_t = J.transpose() # <-- TODO: fix this silly error
     
     return J_t
     

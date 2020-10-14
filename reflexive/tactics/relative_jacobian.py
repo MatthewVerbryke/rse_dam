@@ -197,11 +197,11 @@ class RelativeJacobianController(object):
             # Determine desired joint velocities
             if master:
                 x_dot = self.calculate_desired_vel(cur_pose)
-                Ja_inv = np.linalg.pinv(Ja)
+                Ja_inv = np.linalg.pinv(Ja) # TODO: add warning somewhere if we hit a singularity?
                 q_dot = np.matmul(Ja_inv, x_dot)
             else:
                 x_dot = self.calculate_desired_vel(cur_pose)
-                Ja_inv = np.linalg.pinv(Ja)
+                Ja_inv = np.linalg.pinv(Ja) # TODO: add warning somewhere if we hit a singularity?
                 Na = np.eye[6] - np.matmul(Ja_inv, Ja)
                 Jr_na = np.matmul(Jr, Na)
                 Jr_na_inv = np.linalg.pinv(Jr_na)
