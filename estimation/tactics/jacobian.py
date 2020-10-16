@@ -117,8 +117,8 @@ class DualArmJacobianSolver(object):
             q_right[i] = cur_state.right_joint_state.position[self.right_index[i]]
         
         # Get the individual arm Jacobians (TODO: improve this)
-        J_left = solutions.solve_boxbot_6dof(q_left)
-        J_right = solutions.solve_boxbot_6dof(q_right)
+        J_left = solutions.solve_boxbot_6dof_left(q_left)
+        J_right = solutions.solve_boxbot_6dof_right(q_right)
             
         # Determine relavant frame transformations
         if self.master == "left":

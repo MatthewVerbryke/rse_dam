@@ -17,20 +17,23 @@
 """
 
 
-import csv
 import os
 import string
 import sys
 import tkFileDialog
 import traceback
 
+from geometry_msgs.msg import Pose
 import numpy as np
 import sympy as sp
 from sympy import sin, cos
 from sympy.matrices import Matrix, eye, zeros
+from tf import transformations
+import yaml
 
 
-def get_jacobian_function(DH_param):
+
+def get_jacobian_function(DH_param, base_transform):
     """
     Create the required functions to get the Jacobian based on the DH 
     parameters of the arm.
@@ -63,7 +66,7 @@ def get_jacobian_function(DH_param):
         
         # Multiply this transformation to get the transformation to the ith joint
         if i == 0:
-            T_i[0] = eye(4)*T
+            T_i[0] = base_transform*T
         else:
             T_i[i] = T_i[i-1]*T
         
@@ -86,7 +89,7 @@ def get_jacobian_function(DH_param):
         for k in range(0,3):
             J_func[i, k+3] = w_0i[k]
             
-    return J_func
+    return J_func.T
 
 def format_solution(J_func):
     """
@@ -129,7 +132,7 @@ def format_solution(J_func):
         write_list.append(tab + parse_str + '\n')
     
     # Generating empty matrix (np.array)
-    write_list.append(tab + 'J = np.zeros(6, {})'.format(num_col) + '\n')
+    write_list.append(tab + 'J = np.zeros((6, {}))'.format(num_col) + '\n')
     
     # Solutions for each term in the Jacobian
     for i in range(0,num_col):
@@ -147,6 +150,31 @@ def format_solution(J_func):
     
     return write_list
     
+def pose_to_transformation_matrix(pose):
+    """
+    Convert a 'geometry_msgs/Pose' representation into a homogeneous
+    transformation matrix.
+    
+    TODO: move to a common area for reusability
+    """
+    
+    # Get pose as column vector
+    p = np.array([[pose.position.x],
+                  [pose.position.y],
+                  [pose.position.z]])
+                  
+    # Get rotation matrix from quaternion
+    q = [pose.orientation.x,
+         pose.orientation.y,
+         pose.orientation.z,
+         pose.orientation.w]
+    T = transformations.quaternion_matrix(q)
+    
+    # Place pose element into transformation matrix
+    T[0:3,3:4] = p
+    
+    return T
+    
 def main():
     """
     Main execution script.
@@ -160,18 +188,30 @@ def main():
     
     # As for the csv file containing the DH parameters of the arm
     DH_file = tkFileDialog.askopenfilename(initialdir=src_dir,
-                                           title='Select File',
-                                           filetypes=(('csv files','*.csv'),))
+                                           title='Select DH Parameter File',
+                                           filetypes=(('yaml files','*.yaml'),))
                                            
     # Open and read the contents
-    DH_params = []
-    with open(DH_file, 'rb') as csvfile:
-        csv_reader = csv.reader(csvfile)
-        for row in csv_reader:
-            DH_params.append(row)
+    with open(DH_file, 'rb') as yamlfile:
+        content = yaml.load(yamlfile, Loader=yaml.FullLoader)
+        
+    # Put relevant data into correct formats
+    DH_params = content["DH"]
+    
+    base_pose = []
+    base_pose_content = content["right_arm_base_pose"] #<-- TODO: make more general
+    base_pose = Pose()
+    base_pose.position.x = base_pose_content[0]
+    base_pose.position.y = base_pose_content[1]
+    base_pose.position.z = base_pose_content[2]
+    base_pose.orientation.x = base_pose_content[3]
+    base_pose.orientation.y = base_pose_content[4]
+    base_pose.orientation.z = base_pose_content[5]
+    base_pose.orientation.w = base_pose_content[6]  
             
     # Determine the Jacobian functions
-    J = get_jacobian_function(DH_params)
+    base_T = pose_to_transformation_matrix(base_pose)
+    J = get_jacobian_function(DH_params, base_T)
     write_list = format_solution(J)
     
     # Ask where to put the jacobian function
