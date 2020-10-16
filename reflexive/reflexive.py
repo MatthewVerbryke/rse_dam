@@ -148,7 +148,7 @@ class ReflexiveModule(object):
                                           RLtoHL,
                                           queue_size=1)
         self.command_pub = rospy.Publisher(command_name,
-                                           JointTrajectoryPoint,
+                                           JointState,
                                            queue_size=1)
         
         # Setup ROS Subscribers
@@ -269,10 +269,9 @@ class ReflexiveModule(object):
                 pass
             elif status == 1:
                 self.status = 1
-                self.command_pub.publish(cmd_msg)
+                self.command_pub.publish(command)
             elif status == 2:
                 self.status = 2
-                self.command_pub.publish(cmd_msg)
                 self.state = "reset"
             
             rltohl_msg = build_RLtoHL_msg()
@@ -294,21 +293,22 @@ class ReflexiveModule(object):
         
         # Setup follow controller
         if self.ctrl_type == 1:
+            joint_traj = self.trajectory.joint_trajectory
             controller = FollowController(self.joints, 
                                           self.rate)
-            controller.input_new_trajectory(self.poses)
+            controller.input_new_trajectory(joint_traj)
             
         # Setup relative Jacobian controller with this arm as master
         elif self.ctrl_type == 2:
             controller = RelativeJacobianController(self.joints, 
                                                     self.rate)
-            controller.check_new_trajectory(self.trajectory, True)
+            controller.check_new_trajectory(self.poses, True)
             
         # Setup relative Jacobian controller with this arm as slave
         elif self.ctrl_type == 3:
             controller = RelativeJacobianController(self.joints, 
                                                     self.rate)
-            controller.check_new_trajectory(self.trajectory, False)
+            controller.check_new_trajectory(self.poses, False)
             
         return controller
         

@@ -41,8 +41,8 @@ class FollowController(object):
         self.start = None
         self.end = None
         self.executing = False
-        self.command = JointTrajectoryPoint()
-        self.command.positions = [0.0]*self.num_joints
+        self.command = JointState()
+        self.command.position = [0.0]*self.num_joints
         self.trajectory = JointTrajectory()
         self.cur_goal = JointTrajectoryPoint()
         
@@ -83,33 +83,18 @@ class FollowController(object):
         
         return True
         
-    def reset(self):
-        """
-        Reset the controller to the starting state
-        """
-        
-        self.i = -1
-        self.executing = False
-        self.start = None
-        self.end = None
-        self.command = JointTrajectoryPoint()
-        self.command.positions = [0.0]*self.num_joints
-        self.trajectory = JointTrajectory()
-        self.cur_goal = JointTrajectoryPoint()
-        
     def update(self, last):
         """
         Run through one loop of the controller when executing or waiting
         to execute.
         """
         
-        
-        
         # Wait until the start time has been reached
         if rospy.Time.now() + self.cycle_time < self.start:
-            return 0, None
+            status = 0
+            command = None
         
-        # Handle end of waypoints
+        # Handle end time of current goal
         if rospy.Time.now() + self.cycle_time >= self.end:
             self.i += 1
             
@@ -117,7 +102,8 @@ class FollowController(object):
             if self.i > self.num_traj_points:
                 rospy.loginfo("Trajectory execution completed")
                 self.reset()
-                return 2, None
+                status = 2
+                command = None
                 
             # Update current goal (goes into next conditional statement)
             else:
@@ -140,4 +126,24 @@ class FollowController(object):
                     last[i] += cmd
                 else:
                     velocity[i] = 0
-            return 1, last
+                    
+            # Package Command
+            status = 1
+            command = JointState()
+            command.name = self.joint_names
+            command.position = last
+            
+        return status, command
+        
+    def reset(self):
+        """
+        Reset the controller to the starting state
+        """
+        
+        self.i = 0
+        self.executing = False
+        self.start = None
+        self.end = None
+        self.num_traj_points = None
+        self.trajectory = JointTrajectory()
+        self.cur_goal = JointTrajectoryPoint()

@@ -15,9 +15,10 @@
 """
 
 
-import numpy as np
+import traceback
 
 from geometry_msgs.msg import Pose
+import numpy as np
 import rospy
 from sensor_msgs.msg import JointState
 from tf import transformations
@@ -36,40 +37,45 @@ class RelativeJacobianController(object):
         self.joint_names = joint_names
         self.num_joints = len(joint_names)
         self.rate = rate
-        self.cycle_time = rospy.Duration(rate)
+        self.cycle_time = rospy.Duration(0.01)
         
         # Controller Variables
-        self.waypoint = 0
-        self.num_waypoints = 0
-        self.start = 0.0
-        self.end = 0.0
+        self.i = 0
+        self.start = None
+        self.end = None
+        self.executing = False
         self.trajectory = TimedPoseArray()
-        self.goal_pose = Pose()
+        self.desired = Pose()
         
-    def check_new_trajectory(self, trajectory, master):
+    def input_new_trajectory(self, trajectory, feedback, master):
         """
         Check and store newly recieved trajectory.
         """
         
         # Make sure there is actually a trajectory int the input
-        if not trajectory.Pose or not trajectory.time_from_start:
+        if not trajectory.poses or not trajectory.time_from_start:
             rospy.logerr("Waypoint list empty in the given trajectory")
             return False
         
         # Determine if this arm is "master" or "slave" for this trajectory
         self.master = master
         
-        # Prepare trajectory for execution
+        # Store Trajectory
         self.trajectory = trajectory
-        self.num_waypoints = len(trajectory.poses)
+        self.num_traj_points = len(trajectory.poses)
         self.goal_pose = trajectory.poses[0]
         self.end = trajectory.time_from_start[0]
         
-        # Handle execution start time
-        if trajectory.header.secs == 0 and trajectory.header.nsecs == 0:
-            self.start = rospy.Time.now()
-        else:
-            self.start = trajectory.header
+        # Handle start time
+        self.start = self.trajectory.header.stamp
+        if self.start.secs == 0 and self.start.nsecs == 0:
+            self.start = rospy.Time.now() + self.cycle_time #<-- this may be the cause of the "jump"
+        
+        # Setup new trajectory
+        self.i = 0
+        self.desired = trajectory.poses[0]
+        self.end = self.start + rospy.Duration(trajectory.time_from_start[0])
+        self.last = feedback
         
         return True
         
@@ -104,7 +110,7 @@ class RelativeJacobianController(object):
         T_pose[0:3,3:4] = p_pose
         
         R_ref = transfromations.quaternion_matrix(q_ref)
-        T_ref = np.identity(4)
+        T_ref = eye(4)
         T_ref[0:3,0:3] = R_ref
         T_ref[0:3,3:4] = p_ref
         
@@ -128,7 +134,7 @@ class RelativeJacobianController(object):
         
         return rel_pose
         
-    def calculate_desired_vel(self, cur_pose):
+    def calculate_desired_vel(self, cur_pose, goal_pose):
         """
         Using the current pose of the end-effector, calculate the new 
         goal velocity for the current controller loop.
@@ -139,10 +145,10 @@ class RelativeJacobianController(object):
                                                             cur_pose.orientation.y,
                                                             cur_pose.orientation.z,
                                                             cur_pose.orientation.w])
-        goal_angles = transformations.euler_from_quaternion([self.goal_pose.orientation.x,
-                                                             self.goal_pose.orientation.y,
-                                                             self.goal_pose.orientation.z,
-                                                             self.goal_pose.orientation.w])
+        goal_angles = transformations.euler_from_quaternion([goal_pose.orientation.x,
+                                                             goal_pose.orientation.y,
+                                                             goal_pose.orientation.z,
+                                                             goal_pose.orientation.w])
         
         # Calculate error between current pose and goal pose
         error = [goal_pose.position.x - cur_pose.position.x,
@@ -153,7 +159,8 @@ class RelativeJacobianController(object):
                  goal_angles[2] - cur_angles[2]]
         
         # Get velocities for current step
-        vel = error/(self.rate*(self.end - rospy.Time.now().to_secs()))
+        dt = (self.rate*(self.end.to_sec() - rospy.Time.now().to_sec()))
+        vel = [x/dt for x in error]
         
         return vel
         
@@ -164,7 +171,8 @@ class RelativeJacobianController(object):
         """
         
         # Extract relevant state information
-        if master:
+        if self.master:
+
             cur_joint_angles = state[0]
             Ja = state[1]
             cur_pose = state[3]
@@ -176,31 +184,34 @@ class RelativeJacobianController(object):
         
         # If the start time has not yet arrived, wait
         if rospy.Time.now() + self.cycle_time < self.start:
-            return 0, None
+            status = 0
+            command = None
             
         # If current time is pass the current ending time...
         if rospy.Time.now() + self.cycle_time > self.end:
+            self.i += 1
             
             # Signal success if this is the last waypoint
-            if self.waypoint == self.num_waypoints:
-                return 2, None
+            if self.i == self.num_traj_points:
+                status = 2
+                command = None
             
-            # Otherwise cycle to the next waypoint
+            # Cycle to the next waypoint
             else:
-                self.waypoint += 1
-                self.goal_pose = self.trajectory.poses[self.waypoint]
-                self.end = self.trajectory.time_from_start[self.waypoint]
+                self.desired = self.trajectory.poses[self.i]
+                next_t = self.trajectory.time_from_start[self.i]
+                self.end = self.start + rospy.Duration(next_t)
     
-        # If before the ending time, calculate next command
+        # Determine command to send to joints
         if rospy.Time.now() + self.cycle_time <= self.end:
             
             # Determine desired joint velocities
-            if master:
-                x_dot = self.calculate_desired_vel(cur_pose)
+            if self.master:
+                x_dot = self.calculate_desired_vel(cur_pose, self.desired)
                 Ja_inv = np.linalg.pinv(Ja) # TODO: add warning somewhere if we hit a singularity?
                 q_dot = np.matmul(Ja_inv, x_dot)
             else:
-                x_dot = self.calculate_desired_vel(cur_pose)
+                x_dot = self.calculate_desired_vel(cur_pose, self.desired)
                 Ja_inv = np.linalg.pinv(Ja) # TODO: add warning somewhere if we hit a singularity?
                 Na = np.eye[6] - np.matmul(Ja_inv, Ja)
                 Jr_na = np.matmul(Jr, Na)
@@ -209,11 +220,17 @@ class RelativeJacobianController(object):
                 q_dot = q_dot_d[(self.num_joints+1):]
                 
             # Determine desired joint position command
-            command = cur_joint_angles + q_dot
+            joint_poses = [sum(x) for x in zip(cur_joint_angles, q_dot)]
+            
+            # Package into message
+            status = 1
+            command = JointState()
+            command.name = self.joint_names
+            command.position = joint_poses
             
             return 1, command
             
-    def reset_controller(self):
+    def reset(self):
         """
         Reset controller variables to prepare for a new trajectory to 
         execute.
@@ -221,11 +238,10 @@ class RelativeJacobianController(object):
         
         # Reset variables
         self.master = None
-        self.waypoint = 0
-        self.num_waypoints = 0
-        self.start = 0.0
-        self.end = 0.0
+        self.i = 0
+        self.executing = False
+        self.num_traj_points = 0
+        self.start = None
+        self.end = None
         self.trajectory = TimedPoseArray()
-        self.goal_pose = Pose()
-        
-        return "reset", None
+        self.desired = Pose()
