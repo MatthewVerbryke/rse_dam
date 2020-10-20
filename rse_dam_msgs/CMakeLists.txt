@@ -7,7 +7,7 @@ project(rse_dam_msgs)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS rospy roscpp diagnostic_msgs geometry_msgs moveit_msgs message_generation)
+find_package(catkin REQUIRED COMPONENTS rospy roscpp csa_msgs diagnostic_msgs geometry_msgs moveit_msgs message_generation)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -52,6 +52,7 @@ add_message_files(
    HLtoRL.msg
    RLtoHL.msg
    DualArmState.msg
+   Jacobian.msg
  )
 
 ## Generate services in the 'srv' folder
@@ -71,6 +72,7 @@ add_message_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
    DEPENDENCIES
+   csa_msgs
    diagnostic_msgs
    geometry_msgs
    moveit_msgs

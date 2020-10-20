@@ -8,7 +8,7 @@ bool new_command
 int16 ctrl_type
 #
 # Cartesian space trajectory to follow
-geometry_msgs/PoseArray poses
+csa_msgs/TimedPoseArray poses
 #
 # Joint trajectory goal for the arm to follow
 moveit_msgs/RobotTrajectory trajectory

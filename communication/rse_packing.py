@@ -68,11 +68,11 @@ def pack_dual_arm_state(DAS):
     header = pack_header(DAS.header)
     left_js = pack_jointstate(DAS.left_joint_state)
     left_eef = pack_pose(DAS.left_eef_state)
-    left_J = DAS.left_jacobian
+    left_J = pack_jacobian(DAS.left_jacobian)
     right_js = pack_jointstate(DAS.right_joint_state)
     right_eef = pack_pose(DAS.right_eef_state)
-    right_J = DAS.right_jacobian
-    rel_J = DAS.rel_jacobian
+    right_J = pack_jacobian(DAS.right_jacobian)
+    rel_J = pack_jacobian(DAS.rel_jacobian)
     
     # Package message data
     DAS_msg = {"header": header,
@@ -85,3 +85,30 @@ def pack_dual_arm_state(DAS):
                "rel_jacobian": rel_J}
                
     return DAS_msg
+
+def pack_jacobian(J):
+    """
+    
+    """
+    
+    # Prepare message info
+    name = J.name
+    frame = J.frame
+    row0 = J.row0
+    row1 = J.row1
+    row2 = J.row2
+    row3 = J.row3
+    row4 = J.row4
+    row5 = J.row5
+    
+    # Package message data
+    J_msg = {"name": name,
+             "frame": frame,
+             "row0": row0,
+             "row1": row1,
+             "row2": row2,
+             "row3": row3,
+             "row4": row4,
+             "row5": row5}
+    
+    return J_msg

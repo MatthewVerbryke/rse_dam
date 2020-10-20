@@ -12,17 +12,15 @@
 Header header
 
 sensor_msgs/JointState left_joint_state
-float64[] left_jacobian
+rse_dam_msgs/Jacobian left_jacobian
 geometry_msgs/Pose left_eef_state
 diagnostic_msgs/DiagnosticStatus[] left_status
 
 sensor_msgs/JointState right_joint_state
-float64[] right_jacobian
+rse_dam_msgs/Jacobian right_jacobian
 geometry_msgs/Pose right_eef_state
 diagnostic_msgs/DiagnosticStatus[] right_status
 
-float64[] rel_jacobian
-
-geometry_msgs/Pose target_state
+rse_dam_msgs/Jacobian rel_jacobian
 
 

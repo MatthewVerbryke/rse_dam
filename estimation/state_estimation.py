@@ -25,7 +25,7 @@ from sensor_msgs.msg import JointState
 import rospy
 import tf
 
-from rse_dam_msgs.msg import DualArmState
+from rse_dam_msgs.msg import DualArmState, Jacobian
 from tactics.jacobian import DualArmJacobianSolver
 from tactics.eef_state import EndEffectorStateSolver
 
@@ -198,16 +198,16 @@ class PsuedoStateEstimationModule(object):
         
     def build_state_message(self, ctrl_out):
         """
-        Build a dual arm robot state message
+        Build a 'DualArmState' message.
         """
         
         # Convert jacobians from numpy array to 1-D python lists
         left_J_nest = ctrl_out[0].tolist()
-        left_jacobian = [val for sublist in left_J_nest for val in sublist]
+        left_jacobian = self.build_jacobian_msg(left_J_nest, "left_eef", "torso")
         right_J_nest = ctrl_out[1].tolist()
-        right_jacobian = [val for sublist in right_J_nest for val in sublist]
+        right_jacobian = self.build_jacobian_msg(right_J_nest, "right_eef", "torso")
         rel_J_nest = ctrl_out[2].tolist()
-        rel_jacobian = [val for sublist in rel_J_nest for val in sublist]
+        rel_jacobian = self.build_jacobian_msg(rel_J_nest, "relative", "left_eef")
         
         # Put the new data into the state variable
         self.state.left_jacobian = left_jacobian
@@ -218,6 +218,24 @@ class PsuedoStateEstimationModule(object):
         
         # Send the state variable out as the state message
         msg = self.state
+        
+        return msg
+        
+    def build_jacobian_msg(self, J, name, frame):
+        """
+        Build a 'Jacobian' message.
+        """
+        
+        # input data
+        msg = Jacobian()
+        msg.name = name
+        msg.frame = frame
+        msg.row0 = J[0]
+        msg.row1 = J[1]
+        msg.row2 = J[2]
+        msg.row3 = J[3]
+        msg.row4 = J[4]
+        msg.row5 = J[5]
         
         return msg
         
