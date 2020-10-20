@@ -72,7 +72,7 @@ class DualArmJacobianSolver(object):
                                  [-p_23[1], p_23[0], 0.]])
         
         psi_23 = np.identity(6)
-        psi_23[0:3,3:6] = p_23_skew_sym
+        psi_23[0:3,3:6] = -p_23_skew_sym
         
         omega_21 = np.zeros((6,6))
         omega_21[0:3,0:3] = R_21
@@ -97,8 +97,8 @@ class DualArmJacobianSolver(object):
         """   
         
         try:
-            self.listener.waitForTransform(target, origin, rospy.Time(0), rospy.Duration(4.0))
-            trans, rot = self.listener.lookupTransform(target, origin, rospy.Time(0))
+            self.listener.waitForTransform(origin, target, rospy.Time(0), rospy.Duration(4.0))
+            trans, rot = self.listener.lookupTransform(origin, target, rospy.Time(0))
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
@@ -135,10 +135,12 @@ class DualArmJacobianSolver(object):
             trans_23 = self.lookup_frame_transform(self.right_eef, self.left_eef)
         else:
             return [J_left, J_right, None], "ok"
-            
+        
         # Determine the relative Jacobian
-        R_21 = trfms.quaternion_matrix(trans_21[1])
-        R_24 = trfms.quaternion_matrix(trans_24[1])
+        T_21 = trfms.quaternion_matrix(trans_21[1])
+        R_21 = T_21[0:3,0:3]
+        T_24 = trfms.quaternion_matrix(trans_24[1])
+        R_24 = T_24[0:3,0:3]
         p_23 = trans_23[0]
         J_R = self.get_relative_jacobian(J_A, J_B, R_21, R_24, p_23)
 

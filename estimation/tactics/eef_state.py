@@ -34,6 +34,7 @@ class EndEffectorStateSolver(object):
         self.left_eef = arms["left_arm"]["eef"]
         self.right_base = arms["right_arm"]["base"]
         self.right_eef = arms["right_arm"]["eef"]
+        print self.left_eef, self.right_eef
 
         # Create a TF listener
         self.listener = tf.TransformListener()
@@ -46,8 +47,8 @@ class EndEffectorStateSolver(object):
         
         # Try to get the info on the frames from tf if given a link name
         try:
-            self.listener.waitForTransform(target, origin, rospy.Time(0), rospy.Duration(4.0))
-            trans, rot = self.listener.lookupTransform(target, origin, rospy.Time(0))
+            self.listener.waitForTransform(origin, target, rospy.Time(), rospy.Duration(1.0))
+            trans, rot = self.listener.lookupTransform(origin, target, rospy.Time())
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
