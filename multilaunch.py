@@ -29,7 +29,7 @@ def print_instructions_to_screen():
     """
     pass
     
-def prepare_rosbridge_server(top_dir):
+def prepare_rosbridge_server(TOP_DIR):
     """
     Prepare to launch a rosbridge server
     """
@@ -39,14 +39,14 @@ def prepare_rosbridge_server(top_dir):
     
     # Rosbridge server
     tab_title.extend(["rosbridge_server"])
-    command.extend([''' source %(top_dir)s/devel/setup.bash
+    command.extend([''' source %(TOP_DIR)s/devel/setup.bash
                         cd utilities
                         roslaunch rosbridge_server_9090.launch
     ''' % locals()])
     
     return tab_title, command
 
-def prepare_state_estimator(robot, top_dir, param_files, param_dir, launch_dir):
+def prepare_state_estimator(robot, param_files, param_dir, TOP_DIR):
     """
     Prepare commands to launch all state estimation module components
     """
@@ -56,97 +56,145 @@ def prepare_state_estimator(robot, top_dir, param_files, param_dir, launch_dir):
     
     # Robot dependent nodes for pulling state information together
     tab_title.extend(["state_estimation_support"])
-    command.extend([''' source %(top_dir)s/devel/setup.bash
+    command.extend([''' source %(TOP_DIR)s/devel/setup.bash
                         cd ..
                         roslaunch %(robot)s_bringup %(robot)s_state.launch
     ''' % locals()])
     
     # State Estimator
     tab_title.extend(["state_estimation"])
-    command.extend([''' source %(top_dir)s/devel/setup.bash
+    command.extend([''' source %(TOP_DIR)s/devel/setup.bash
                         cd estimation
+                        rosparam set /use_sim_time true
                         python state_estimation.py %(param_files)s %(param_dir)s
     ''' % locals()])
     
     return tab_title, command
     
-def prepare_reflexive_layer(robot, side, sim, top_dir, param_files, param_dir, launch_dir):
+def prepare_reflexive_layer(side, param_files, param_dir, TOP_DIR):
     """
-    
+    Prepare commands to launch all reflexive layer module components for
+    one arm in a dual arm setup
     """
     
     tabtitle = []
     command = []
     
-    tabtitle.extend(["reflexive_module"])
-    command.extend([''' source %(top_dir)s/devel/setup.bash
-                        cd reflexive
-                        python reflexive.py %(param_files)s %(param_dir)s %(side)s
-    ''' % locals()])
+    if side == None:
+        
+        tabtitle.extend(["reflexive_module"])
+        command.extend([''' source %(TOP_DIR)s/devel/setup.bash
+                            cd reflexive
+                            rosparam set /use_sim_time true
+                            python reflexive_unified.py %(param_files)s %(param_dir)s
+        ''' % locals()])
+        
+        
+    else:
+    
+        tabtitle.extend(["{}_reflexive_module".format(side)])
+        command.extend([''' source %(TOP_DIR)s/devel/setup.bash
+                            cd reflexive
+                            rosparam set /use_sim_time true
+                            python reflexive.py %(param_files)s %(param_dir)s %(side)s
+        ''' % locals()])
     
     return tabtitle, command
+    
+def prepare_habitual_layer():
+    """
+    
+    """
+    pass
+    
+def prepare_deliberative_layer():
+    """
+    
+    """
+    pass
 
 if __name__ == "__main__":
     
-    # Get import directory paths
-    top_dir = "../.." # where toplevel stuff needs to get to
-    rse_dir = "./src/rse_dam" # where we start
+    # Get command line inputs
+    launch_DL = bool(int(sys.argv[1]))
+    launch_left_HL = bool(int(sys.argv[2]))
+    launch_right_HL = bool(int(sys.argv[3]))
+    launch_left_RL = bool(int(sys.argv[4]))
+    launch_right_RL = bool(int(sys.argv[5]))
+    launch_unified_RL = bool(int(sys.argv[6]))
+    launch_SEM = bool(int(sys.argv[7]))
+    launch_rosbridge = bool(int(sys.argv[8]))
     
     # Storage for launch information
     groups = []
     
-    # Input parameters (TODO: set in stone currently, improve)
-    robot_name = "boxbot"
+    # Global Variables which shouldn't change
+    TOP_DIR = "../.." # where toplevel stuff needs to get to
+    RSE_DIR = "./src/rse_dam" # where we start
+    
+    # Input parameters (TODO: "set-in-stone" currently, improve)
+    robot = "boxbot"
     sim = "true"
-    side = "left"
     param_files = "arm_6dof,connections,default"
     bringup_dir = "/home/matthew/catkin_ws/src/boxbot_ros/boxbot_bringup/"
     param_dir = bringup_dir + "config"
     launch_dir = bringup_dir + "launch"
     
-    # launch parameters (TODO: improve)
-    launch_rosbridge = False
-    launch_SEM = False
-    launch_DL = False
-    launch_HL = False
-    launch_RL = True
-    
+    #=== PREPARE TERMINALS SCRIPTS ====================================#
     try:
         
-        # Get the rosbridge server launch information
+        #--- ROSBRIDGE SERVER -----------------------------------------#
         if launch_rosbridge:
-            tab_title, command = prepare_rosbridge_server(top_dir)
+            tab_title, command = prepare_rosbridge_server(TOP_DIR)
             groups.append((tab_title, command))
         
-        # Get the state estimator module(s) launch information
+        #--- STATE ESTIMATION MODULE ----------------------------------#
         if launch_SEM:
-            tab_title, command = prepare_state_estimator(robot_name,
-                                                         top_dir,
+            tab_title, command = prepare_state_estimator(robot,
                                                          param_files,
                                                          param_dir,
-                                                         launch_dir)
+                                                         TOP_DIR)
             groups.append((tab_title, command))
             
-        # Get the reflexive layer module(s) launch information
-        if launch_RL:
-            tab_title, command = prepare_reflexive_layer(robot_name,
-                                                         side, 
-                                                         sim,
-                                                         top_dir,
+        #--- REFLEXIVE LAYER ------------------------------------------#
+        # Left
+        if launch_left_RL:
+            tab_title, command = prepare_reflexive_layer("left",
                                                          param_files,
                                                          param_dir,
-                                                         launch_dir)
+                                                         TOP_DIR)
             groups.append((tab_title, command))
         
-        # Get the habitual layer module(s) launch information
-        if launch_HL:
+        # Right
+        if launch_right_RL:
+            tab_title, command = prepare_reflexive_layer("right",
+                                                         param_files,
+                                                         param_dir,
+                                                         TOP_DIR)
+            groups.append((tab_title, command))
+        
+        # Single/Unified
+        if launch_unified_RL:
+            tab_title, command = prepare_reflexive_layer(None,
+                                                         param_files,
+                                                         param_dir,
+                                                         TOP_DIR)
+            groups.append((tab_title, command))
+        
+        #--- HABITUAL LAYER -------------------------------------------#
+        # Left
+        if launch_left_HL:
             pass #TODO
         
-        # Get the deliberative layer module(s) launch information
+        # Right
+        if launch_right_HL:
+            pass #TODO
+        
+        #--- DELIBERATIVE LAYER ---------------------------------------#
         if launch_DL:
             pass #TODO
             
-        # Launch all desired components
+        # Launch all the prepared components
         for group in groups:
             terminal = ["gnome-terminal"]
             for i in range(len(group[1])):

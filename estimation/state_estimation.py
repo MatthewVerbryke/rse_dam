@@ -202,6 +202,7 @@ class PsuedoStateEstimationModule(object):
         """
         
         # Convert jacobians from numpy array to 1-D python lists
+        stamp = rospy.Time.now()
         left_J_nest = ctrl_out[0].tolist()
         left_jacobian = self.build_jacobian_msg(left_J_nest, "left_eef", "torso")
         right_J_nest = ctrl_out[1].tolist()
@@ -210,6 +211,7 @@ class PsuedoStateEstimationModule(object):
         rel_jacobian = self.build_jacobian_msg(rel_J_nest, "relative", "left_eef")
         
         # Put the new data into the state variable
+        self.state.header.stamp = stamp
         self.state.left_jacobian = left_jacobian
         self.state.left_eef_state = ctrl_out[3]
         self.state.right_jacobian = right_jacobian
@@ -311,6 +313,7 @@ class PsuedoStateEstimationModule(object):
             self.local_state_pub.publish(msg)
             for pub in self.pubs:
                 pub.send(msg)
+
 
 
 if __name__ == "__main__":

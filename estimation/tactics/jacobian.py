@@ -29,6 +29,7 @@ class DualArmJacobianSolver(object):
         
         # Parameters
         self.robot = robot
+        self.base = "torso" #<-- TODO: make more general
         self.left_names = arms["left_arm"]["name"]
         self.left_index = arms["left_arm"]["index"]
         self.right_names = arms["right_arm"]["name"]
@@ -124,14 +125,14 @@ class DualArmJacobianSolver(object):
         if self.master == "left":
             J_A = J_left
             J_B = J_right
-            trans_21 = self.lookup_frame_transform(self.left_eef, self.left_base)
-            trans_24 = self.lookup_frame_transform(self.left_eef, self.right_base)
+            trans_21 = self.lookup_frame_transform(self.left_eef, self.base)
+            trans_24 = self.lookup_frame_transform(self.left_eef, self.base)
             trans_23 = self.lookup_frame_transform(self.left_eef, self.right_eef)
         elif self.master == "right":
             J_A = J_right
             J_B = J_left
-            trans_21 = self.lookup_frame_transform(self.right_eef, self.right_base)
-            trans_24 = self.lookup_frame_transform(self.right_eef, self.left_base)
+            trans_21 = self.lookup_frame_transform(self.right_eef, self.base)
+            trans_24 = self.lookup_frame_transform(self.right_eef, self.base)
             trans_23 = self.lookup_frame_transform(self.right_eef, self.left_eef)
         else:
             return [J_left, J_right, None], "ok"
