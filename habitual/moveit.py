@@ -27,15 +27,16 @@ from sensor_msgs.msg import JointState
 import rospy
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-import reachability as rech
-import correction as crct
+import tactics.reachability as rech
+import tactics.correction as crct
 
 # retrive files nessecary for websocket comms
 file_dir = sys.path[0]
 sys.path.append(file_dir + "/..")
 sys.path.append(file_dir + "/../..")
+from common import params
 from communication import rse_packing as rpack
-from rse_dam_msgs.msg import HLtoDL, DLtoHL
+from rse_dam_msgs.msg import HLtoDL, DLtoHL, HLtoRL, RLtoHL, DualArmState
 from rss_git_lite.common import rosConnectWrapper as rC
 from rss_git_lite.common import ws4pyRosMsgSrvFunctions_gen as ws4pyROS
 
@@ -54,42 +55,55 @@ class MoveItHabitualModule(object):
         # Initialize moveit_commander
         moveit_commander.roscpp_initialize(sys.argv)
         
+        # Get command line arguments
+        param_files = sys.argv[1]
+        param_dir = sys.argv[2]
+        self.side = sys.argv[3]
+        
+        # Get kinematic parameters from retrieved files
+        param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
+        self.robot = param_dict["robot"]
+        self.planning_group = self.side + param_dict["planning_group"]
+        self.gripper_group = self.side + param_dict["gripper_group"]
+        self.ref_frame = "world" #TODO: tie to input arguments?
+        arm_joints = param_dict["joints"]["arm"]
+        self.joint_names = ["{}_{}_joint".format(self.side, j) for j in arm_joints]
+        
+        # Get ip connection for other computer (TODO: change for more than one connection)
+        connections = param_dict["connections"]
+        if self.side == "left":
+            self.local_ip = connections["main"]
+            self.connection = connections["main"]
+        else:
+            self.local_ip = connections["right_arm"]
+            self.connection = connections["main"]
+        
+        # Print parameters to screen
+        rospy.loginfo("Side: {}".format(self.side))
+        rospy.loginfo("Planning group: {}".format(self.planning_group))
+        rospy.loginfo("Gripper planning group: {}".format(self.gripper_group))
+        rospy.loginfo("Reference frame: {}".format(self.ref_frame))
+        rospy.loginfo("Joints: {}".format(self.joint_names))
+        rospy.loginfo("Secondary computer IP address: {}".format(self.connection))
+        
         # Initialize rospy node
-        rospy.init_node("habitual_module")
+        rospy.init_node("{}_habitual_module".format(self.side))
         
         # Initialize cleanup for this node
         rospy.on_shutdown(self.cleanup)
         
         # Get a lock
         self.lock = thread.allocate_lock()
-        
-        # Get command line arguments
-        self.planning_group = sys.argv[1]
-        self.gripper_group = sys.argv[2]
-        self.ref_frame = sys.argv[3]
-        self.joint_names = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5"] #<- can't pass in as argument?
-        left_arm = sys.argv[4]
-        self.connection = sys.argv[5]
-        if (left_arm=="True"):
-            self.side = "left"
-        elif (left_arm=="False"):
-            self.side = "right"
-        rospy.loginfo("planning group: {}".format(self.planning_group))
-        rospy.loginfo("gripper planning group: {}".format(self.gripper_group))
-        rospy.loginfo("reference frame: {}".format(self.ref_frame))
-        rospy.loginfo("joints: {}".format(self.joint_names))
-        rospy.loginfo("side: {}".format(self.side))
-        rospy.loginfo("secondary computer IP address: {}".format(self.connection))
-               
+              
         # Initialize a move group for the arm and end effector planning groups
         self.arm = moveit_commander.MoveGroupCommander("{}".format(self.planning_group))
         self.gripper = moveit_commander.MoveGroupCommander("{}".format(self.gripper_group))
         
         # Get/set robot parameters
-        self.eef_link = self.arm.get_end_effector_link()
+        self.eef_link = "left_" + param_dict["eef_link"]
         self.target_ref_frame = self.ref_frame
         self.arm.set_pose_reference_frame(self.ref_frame)
-        self.correction_needed = True
+        self.correction_needed = False
         
         # Module information setup
         self.state = "start"
@@ -111,8 +125,9 @@ class MoveItHabitualModule(object):
         self.pose_traj = PoseArray()
         self.trajectory = RobotTrajectory()
         
-        # DL status setup
+        # Status setup
         self.dl_return = DLtoHL()
+        self.rl_return = int()
         
         # Planning information setup
         self.arm.allow_replanning(True)
@@ -143,11 +158,12 @@ class MoveItHabitualModule(object):
         Main execution loop for the HL module
         """
         
+        r = rospy.Rate(20.0)
         while not rospy.is_shutdown():
-            print(self.state)
+            #print(self.state)
             self.run_state_machine()
             self.publish_HLtoDL()
-            rospy.sleep(0.01)
+            r.sleep()
             #raw_input("Enter for next state...")
             
     def cleanup(self):
@@ -176,12 +192,17 @@ class MoveItHabitualModule(object):
         #       same computer as the DL. The right arm movegroup is assumed
         #       to be on a separate computer, requiring websocket comms.
         if (self.side=="left"):
-            self.HL_to_DL_pub = rospy.Publisher("/left_habitual/to_dl", HLtoDL, queue_size=1)
+            self.HL_to_DL_pub = rospy.Publisher("left_HLtoDL", HLtoDL, queue_size=1)
         elif (self.side=="right"):
-            self.HL_to_DL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/right_habitual/to_dl", "rse_dam_msgs/HLtoDL", rpack.pack_HL_to_DL)
+            self.HL_to_DL_pub = rC.RosMsg('ws4py', "ws://"+self.connection+":9090/", "pub", "right_HLtoDL", "rse_dam_msgs/HLtoDL", rpack.pack_HL_to_DL)
+        self.HL_to_RL_pub = rospy.Publisher("HLtoRL", HLtoRL, queue_size=1)
         
         # Setup subscribers
-        self.DL_to_HL_sub = rospy.Subscriber("/deliberative/to_hl", DLtoHL, self.dl_to_hl_cb)
+        self.DL_to_HL_sub = rospy.Subscriber("{}_DLtoHL".format(self.side), DLtoHL, self.dl_to_hl_cb)
+        self.RL_to_HL_sub = rospy.Subscriber("RLtoHL", RLtoHL, self.rl_to_hl_cb)
+        self.joint_state_sub = rospy.Subscriber("{}/{}_arm/joint_states".format(self.robot, self.side),
+                                                JointState,
+                                                self.joint_state_cb)
 
     def dl_to_hl_cb(self, msg):
         """
@@ -200,6 +221,39 @@ class MoveItHabitualModule(object):
         # Store last response
         self.dl_return = msg
         self.lock.release()
+        
+    def joint_state_cb(self, msg):
+        """
+        Callback for arm state msgs.
+        """
+        
+        # Extract current joint state
+        self.lock.acquire()
+        self.cur_joint_state = msg
+        self.lock.release()
+        
+    def rl_to_hl_cb(self, msg):
+        """
+        Callback function for messages from the reflexive layer.
+        """
+
+        #Extract information from message
+        self.lock.acquire()
+        self.rl_status = msg.status
+        self.lock.release()
+        
+    def build_HLtoRL_msg(self, is_new, ctrl_type, trajectory):
+        """
+        Build a 'HLtoDL' message
+        """
+        
+        # Fill out the HLtoRL message from input info
+        msg = HLtoRL()
+        msg.new_command = is_new
+        msg.ctrl_type = ctrl_type
+        msg.trajectory = trajectory
+        
+        return msg       
         
     def create_HLtoDL(self):
         """
@@ -305,7 +359,7 @@ class MoveItHabitualModule(object):
             # FIXME: a better way to do this?
             elif self.executed and (self.status==6):
                 self.increment += 1 
-                if (self.increment<=50):
+                if self.rl_status!=2:
                     pass
                 else:
                     self.state = "standby"
@@ -322,9 +376,6 @@ class MoveItHabitualModule(object):
         """
         Wait for the DL to send down a new goal.
         """
-        
-        # Retrieve the current eff position
-        self.get_current_eef_pose()
         
         # Check the new command flag to see if this is a new command
         if (self.new_command==0):
@@ -438,17 +489,17 @@ class MoveItHabitualModule(object):
         the group, construct a 'RobotTrajectory'.
         """
         
-        # Initialize trajectory
+        # Initialize trajectory (TODO: improve timing)
         self.trajectory = RobotTrajectory()
         self.trajectory.joint_trajectory.header.seq = copy.deepcopy(points_array.header.seq)
-        self.trajectory.joint_trajectory.header.stamp = rospy.Time.now()
+        self.trajectory.joint_trajectory.header.stamp = rospy.Time(0.0)
         self.trajectory.joint_trajectory.header.frame_id = self.ref_frame
         self.trajectory.joint_trajectory.joint_names = self.joint_names
         
-        # Loop setup
+        # Loop setup (TODO: fix this whole section)
         poses_tot = len(points_array.poses)
         trajectory_points = [None]*poses_tot
-        feed_joint_state = self.arm.get_current_joint_values()
+        feed_joint_state = [0.0]*(len(self.joint_names))
         time_stamps = ast.literal_eval(timestamp_string)
         
         # Build an array of JointTrajectoryPoint waypoints
@@ -471,12 +522,14 @@ class MoveItHabitualModule(object):
             
             # Initialize JointTrajectoryPoint message
             trajectory_point = JointTrajectoryPoint()
-            joint_positions = [None]*5 
             
-            # Remove the gripper joints from the message 
+            # Filter out joint messages
             # FIXME: better way to do this?
-            for j in range(0,5):
-                joint_positions[j] = resp.solution.joint_state.position[j]
+            resp_pose = resp.solution.joint_state
+            joint_positions = []
+            for name in self.joint_names:
+                idx = resp_pose.name.index(name)
+                joint_positions.append(resp_pose.position[idx])
                 
             # Wrist joint correction for the WidowX arm
             if self.correction_needed:
@@ -543,18 +596,21 @@ class MoveItHabitualModule(object):
         TODO: Rework?
         """
         
+        msg = self.build_HLtoRL_msg(True, 1,  self.trajectory)
+        
         # Execute the generated plan
         rospy.loginfo("Excuting trajectory...")
-        success = self.arm.execute(self.trajectory)
-        
-        # Wait a second
-        rospy.sleep(1)
+        #success = self.arm.execute(self.trajectory)
+        i = 0
+        while i < 5:
+            i += 1
+            self.HL_to_RL_pub.publish(msg)
         
         # If it failed tell the Op and DL so
-        if not success:
-            self.fail_info = "Execution of the trajectory plan has failed"
+        #if not success:
+            #self.fail_info = "Execution of the trajectory plan has failed"
             
-        return success
+        return True
         
     def reset_module(self):
         """
@@ -608,7 +664,7 @@ class MoveItHabitualModule(object):
         except rospy.ServiceException:
             rospy.logerr("Service execption: " + str(rospy.ServiceException))
         
-    def ik_solve(self, pose, feed_joint_state=[0.0,0.0,0.0,0.0,0.0]):
+    def ik_solve(self, pose, feed_joint_state):
         """ 
         Given a end-effector pose, use inverse kinematics to determine the
         nessecary joint angles to reach the pose.

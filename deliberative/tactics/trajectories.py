@@ -20,6 +20,33 @@ import rospy
 import tf
 
 
+def create_static_trajectory(pose, timestamps, ref_frame):
+    """
+    
+    """
+    
+    # Basic information
+    timestep = 0.35
+    num_waypoints = len(timestamps)
+    
+    # Fill out array header
+    trajectory = PoseArray()
+    trajectory.header.seq = 0
+    trajectory.header.frame_id = str(ref_frame)
+    
+    pose_list = [None]*(num_waypoints)
+    timestamps = []
+    
+    # Put pose into list
+    for i in range(0, num_waypoints):
+        pose_list[i] = copy.deepcopy(pose)
+        
+    # Package result
+    trajectory.poses = pose_list
+    
+    return trajectory
+
+
 def create_simple_move_trajectory(start_pose, goal_pose, speed, ref_frame):
     """
     Create a simple trajectory in which the target object moves from the

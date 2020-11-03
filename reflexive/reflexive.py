@@ -77,18 +77,14 @@ class ReflexiveModule(object):
         joints = param_dict["joints"]
         
         # Get full joint names
-        self.arm_joints = ["{}_{}".format(self.side, joint) for joint in joints["arm"]]
-        self.eef_joints = ["{}_{}".format(self.side, joint) for joint in joints["eef"]]
+        self.arm_joints = ["{}_{}_joint".format(self.side, joint) for joint in joints["arm"]]
+        self.eef_joints = ["{}_{}_joint".format(self.side, joint) for joint in joints["eef"]]
         
         # State variables
-        self.joint_state = JointState()
-        self.jacobian = np.zeros((6,len(self.arm_joints)))
-        self.rel_jacobian = np.zeros((6,2*len(self.arm_joints)))
-        self.eef_pose = Pose()
+        self.arm_state = JointState()
         
         # Control parameters
         self.control_type = None
-        self.poses = TimedPoseArray()
         self.trajectory = JointTrajectory()
         self.new_command = False
         self.state = "start"
@@ -112,7 +108,7 @@ class ReflexiveModule(object):
         Main execution loop for the module.
         """
         
-        r = rospy.Rate(50.0)
+        r = rospy.Rate(self.rate)
         while not rospy.is_shutdown():
             self.state_machine()
             r.sleep()
@@ -135,12 +131,11 @@ class ReflexiveModule(object):
         """
         
         # Message topic names
-        RLtoHL_name = "{}/{}_arm/RLtoHL".format(self.robot,
-                                                  self.side)
-        HLtoRL_name = "{}/{}_arm/HLtoRL".format(self.robot, 
-                                                  self.side)
-        state_name = "{}/state_estimate".format(self.robot)
-        command_name = "{}/{}_arm/command".format(self.robot,
+        RLtoHL_name = "RLtoHL"
+        HLtoRL_name = "HLtoRL"
+        joint_state_name = "{}/{}_arm/joint_states".format(self.robot,
+                                                          self.side)
+        command_name = "{}/{}_arm/commands".format(self.robot,
                                                   self.side)
         
         # Setup ROS Publishers
@@ -155,8 +150,8 @@ class ReflexiveModule(object):
         self.HLtoRL_sub = rospy.Subscriber(HLtoRL_name,
                                            HLtoRL,
                                            self.HLtoRL_cb)
-        self.state_sub = rospy.Subscriber(state_name,
-                                          DualArmState,
+        self.state_sub = rospy.Subscriber(joint_state_name,
+                                          JointState,
                                           self.state_cb)
                                           
     def build_RLtoHL_msg(self):
@@ -177,6 +172,17 @@ class ReflexiveModule(object):
         controllers/hardware.
         """
         
+                
+        msg = JointState()
+        msg.header.stamp = rospy.Time.now()
+        msg.name = self.arm_joints + self.eef_joints
+        if command != None:
+            command.append(0.0) # <-- TODO: improve this
+        msg.position = command
+        
+        return msg
+        
+        
         msg = JointTrajectoryPoint()
         msg.positions = command
         msg.time_from_start = rospy.Time(0)
@@ -195,7 +201,7 @@ class ReflexiveModule(object):
             
             # Extract control info
             self.new_command = bool(msg.new_command)
-            self.control_type = msg.ctrl_type
+            self.ctrl_type = msg.ctrl_type
             self.poses = msg.poses
             self.trajectory = msg.trajectory
         
@@ -214,29 +220,9 @@ class ReflexiveModule(object):
         
         try:
             
-            # Extract state info
-            if self.side == "left":
-                self.joint_state = msg.left_joint_state
-                self.jacobian = msg.left_jacobian
-                self.other_jacobian = msg.right_jacobian
-                self.eef_state = msg.left_eef_state
-                self.other_eef_state = msg.right_eef_state
-            elif self.side == "right":
-                self.joint_state = msg.right_joint_state
-                self.jacobian = msg.right_jacobian
-                self.other_jacobian = msg.left_jacobian
-                self.eef_state = msg.right_eef_state
-                self.other_eef_state = msg.left_eef_state
-            self.rel_jacobian = msg.rel_jacobian
-            
-            # 'Package' state information
-            self.arm_state = [self.joint_state,
-                              self.jacobian,
-                              self.other_jacobian,
-                              self.eef_state,
-                              self.other_eef_state,
-                              self.rel_jacobian]
-            
+            # Store state message
+            self.arm_state = msg
+        
         finally:
             
             # Release lock
@@ -264,26 +250,30 @@ class ReflexiveModule(object):
         
         # Execute the trajectory
         elif self.state == "execute":
-            command, status = self.controller.update(self.arm_state)
+            goal, status = self.controller.update(self.arm_state)
             if status == 0:
                 pass
             elif status == 1:
                 self.status = 1
-                self.command_pub.publish(command)
+                if goal != None:
+                    command = self.build_command_msg(goal)
+                    self.command_pub.publish(command)
             elif status == 2:
                 self.status = 2
                 self.state = "reset"
             
-            rltohl_msg = build_RLtoHL_msg()
-            self.RLtoHL_pub.publish(rltohl_msg)
-            
         # Reset module
-        elif self.state == "reset":
-            self.controller = None
-            self.status = 0
-            self.state == "standby"
+        elif self.state == "reset": 
+            self.controller = None # TODO: in future, don't always get rid of controller
+            self.new_command = False
+            self.status = 2
+            self.state = "standby"
+        
+        # Publish a return message to the reflexive layer at all times
+        rltohl_msg = self.build_RLtoHL_msg()
+        self.RLtoHL_pub.publish(rltohl_msg)
             
-    #==== Module Behaviors ============================================#
+    #==== MODULE BEHAVIORS ============================================#
             
     def setup_controller(self):
         """
@@ -294,21 +284,12 @@ class ReflexiveModule(object):
         # Setup follow controller
         if self.ctrl_type == 1:
             joint_traj = self.trajectory.joint_trajectory
-            controller = FollowController(self.joints, 
+            controller = FollowController(self.arm_joints, 
                                           self.rate)
             controller.input_new_trajectory(joint_traj)
-            
-        # Setup relative Jacobian controller with this arm as master
-        elif self.ctrl_type == 2:
-            controller = RelativeJacobianController(self.joints, 
-                                                    self.rate)
-            controller.check_new_trajectory(self.poses, True)
-            
-        # Setup relative Jacobian controller with this arm as slave
-        elif self.ctrl_type == 3:
-            controller = RelativeJacobianController(self.joints, 
-                                                    self.rate)
-            controller.check_new_trajectory(self.poses, False)
+        else:
+            rospy.logerr("Desired controller type not recognized")
+            return None
             
         return controller
         
