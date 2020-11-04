@@ -24,18 +24,18 @@ test = 6
 # Horizontal move test
 if (test==1):
     start_pose = Pose()
-    start_pose.position.x = 0.24
-    start_pose.position.y = -0.075
-    start_pose.position.z = 0.26035
+    start_pose.position.x = 0.209
+    start_pose.position.y = −0.075
+    start_pose.position.z =  0.24952
     start_pose.orientation.x = 0.0
     start_pose.orientation.y = 0.0
     start_pose.orientation.z = 0.0
     start_pose.orientation.w = 1.0
 
     goal_pose = Pose()
-    goal_pose.position.x = 0.24
+    goal_pose.position.x = 0.209
     goal_pose.position.y = 0.075
-    goal_pose.position.z = 0.26035
+    goal_pose.position.z =  0.24952
     goal_pose.orientation.x = 0.0
     goal_pose.orientation.y = 0.0
     goal_pose.orientation.z = 0.0

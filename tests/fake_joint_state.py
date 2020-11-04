@@ -13,7 +13,7 @@ def fake_joint_state(side):
     """
     
     # Initialize Node
-    rospy.init_node("fake_joint_state_publisher", anonymous=True)
+    rospy.init_node("fake_joint_state_publisher")
     
     # Parameters 
     joints = ["{}_shoulder_1_joint".format(side),
@@ -26,13 +26,14 @@ def fake_joint_state(side):
               "{}_gripper_prismatic_joint_2".format(side)]
 
     # ROS publisher
-    pub = rospy.Publisher("boxbot/{}_arm/joint_states".format(side),
+    pub = rospy.Publisher("boxbot/{}_joint_state".format(side),
                           JointState,
                           queue_size=1)
     
     command = JointState()
     command.name = joints
     command.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    command.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     
     r = rospy.Rate(50.0)
     while not rospy.is_shutdown():

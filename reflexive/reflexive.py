@@ -69,7 +69,7 @@ class ReflexiveModule(object):
         # Get main parameters from file
         self.global_frame = "world"
         param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
-        self.rate = param_dict["rate"]
+        self.rate = 30#param_dict["rate"]
         self.robot = param_dict["robot"]
         self.connections = param_dict["connections"]
         self.local_ip = self.connections["{}_arm".format(self.side)]
@@ -181,14 +181,7 @@ class ReflexiveModule(object):
         msg.position = command
         
         return msg
-        
-        
-        msg = JointTrajectoryPoint()
-        msg.positions = command
-        msg.time_from_start = rospy.Time(0)
-        
-        return msg
-                                          
+    
     def HLtoRL_cb(self, msg):
         """
         Callback function for command sent from the habitual layer.
@@ -261,13 +254,17 @@ class ReflexiveModule(object):
             elif status == 2:
                 self.status = 2
                 self.state = "reset"
+                self.hold = 0
             
         # Reset module
-        elif self.state == "reset": 
-            self.controller = None # TODO: in future, don't always get rid of controller
-            self.new_command = False
-            self.status = 2
-            self.state = "standby"
+        elif self.state == "reset":
+            if self.hold < 6:
+                self.hold += 1
+                self.status = 2
+            else:
+                self.status = 2
+                self.new_command = False
+                self.state = "standby"
         
         # Publish a return message to the reflexive layer at all times
         rltohl_msg = self.build_RLtoHL_msg()

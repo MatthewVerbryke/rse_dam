@@ -8,8 +8,6 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit
   history.
-  
-  TODO: Test
 """
 
 
@@ -58,6 +56,7 @@ def prepare_state_estimator(robot, param_files, param_dir, TOP_DIR):
     tab_title.extend(["state_estimation_support"])
     command.extend([''' source %(TOP_DIR)s/devel/setup.bash
                         cd ..
+                        rosparam set /use_sim_time true
                         roslaunch %(robot)s_bringup %(robot)s_state.launch
     ''' % locals()])
     
@@ -74,7 +73,7 @@ def prepare_state_estimator(robot, param_files, param_dir, TOP_DIR):
 def prepare_reflexive_layer(side, param_files, param_dir, TOP_DIR):
     """
     Prepare commands to launch all reflexive layer module components for
-    one arm in a dual arm setup
+    the dual arm setup
     """
     
     tabtitle = []
@@ -91,7 +90,7 @@ def prepare_reflexive_layer(side, param_files, param_dir, TOP_DIR):
         
         
     else:
-    
+
         tabtitle.extend(["{}_reflexive_module".format(side)])
         command.extend([''' source %(TOP_DIR)s/devel/setup.bash
                             cd reflexive
@@ -101,17 +100,57 @@ def prepare_reflexive_layer(side, param_files, param_dir, TOP_DIR):
     
     return tabtitle, command
     
-def prepare_habitual_layer():
+def prepare_habitual_layer(side, param_files, param_dir, TOP_DIR, robot):
+    """
+    Prepare commands to launch all habitual layer module components for
+    the dual arm setup.
+    """
+    
+    tabtitle = []
+    command = []
+    
+    if side == None:
+        
+        tabtitle.extend(["habitual_module"])
+        command.extend([''' source %(TOP_DIR)s/devel/setup.bash
+                            cd habitual
+                            rosparam set /use_sim_time true
+                            python habitual_unified.py %(param_files)s %(param_dir)s
+        ''' % locals()])
+        
+        
+    else:
+    
+        tabtitle.extend(["movegroup_node"])
+        command.extend([''' source %(TOP_DIR)s/devel/setup.bash
+                            roslaunch %(robot)s_bringup boxbot_moveit.launch
+        ''' % locals()])
+        
+        tabtitle.extend(["{}_habitual_module".format(side)])
+        command.extend([''' source %(TOP_DIR)s/devel/setup.bash
+                            cd habitual
+                            rosparam set /use_sim_time true
+                            python moveit.py %(param_files)s %(param_dir)s %(side)s
+        ''' % locals()])
+    
+    return tabtitle, command
+    
+def prepare_deliberative_layer(param_files, param_dir, TOP_DIR):
     """
     
     """
-    pass
     
-def prepare_deliberative_layer():
-    """
+    tabtitle = []
+    command = []
+        
+    tabtitle.extend(["deliberative_module"])
+    command.extend([''' source %(TOP_DIR)s/devel/setup.bash
+                        cd deliberative
+                        python deliberative.py %(param_files)s %(param_dir)s
+    ''' % locals()])
     
-    """
-    pass
+    return tabtitle, command
+        
 
 if __name__ == "__main__":
     
@@ -119,11 +158,12 @@ if __name__ == "__main__":
     launch_DL = bool(int(sys.argv[1]))
     launch_left_HL = bool(int(sys.argv[2]))
     launch_right_HL = bool(int(sys.argv[3]))
-    launch_left_RL = bool(int(sys.argv[4]))
-    launch_right_RL = bool(int(sys.argv[5]))
-    launch_unified_RL = bool(int(sys.argv[6]))
-    launch_SEM = bool(int(sys.argv[7]))
-    launch_rosbridge = bool(int(sys.argv[8]))
+    launch_unified_HL = bool(int(sys.argv[4]))
+    launch_left_RL = bool(int(sys.argv[5]))
+    launch_right_RL = bool(int(sys.argv[6]))
+    launch_unified_RL = bool(int(sys.argv[7]))
+    launch_SEM = bool(int(sys.argv[8]))
+    launch_rosbridge = bool(int(sys.argv[9]))
     
     # Storage for launch information
     groups = []
@@ -182,18 +222,46 @@ if __name__ == "__main__":
             groups.append((tab_title, command))
         
         #--- HABITUAL LAYER -------------------------------------------#
+        # Warn user about Moveit preemptability
+        if launch_left_HL and launch_right_HL:
+            print "WARNING: two movegroups on the same ROS master will preempt each other when running the same services simulatneously"
+        
         # Left
         if launch_left_HL:
-            pass #TODO
+            tab_title, command = prepare_habitual_layer("left",
+                                                        param_files,
+                                                        param_dir,
+                                                        TOP_DIR,
+                                                        robot)
+            groups.append((tab_title, command))
         
         # Right
         if launch_right_HL:
-            pass #TODO
+            tab_title, command = prepare_habitual_layer("right",
+                                                        param_files,
+                                                        param_dir,
+                                                        TOP_DIR,
+                                                        robot)
+            groups.append((tab_title, command))
+        
+        # Single/Unified
+        if launch_unified_HL:
+            tab_title, command = prepare_habitual_layer(None,
+                                                        param_files,
+                                                        param_dir,
+                                                        TOP_DIR,
+                                                        robot)
+            groups.append((tab_title, command))
         
         #--- DELIBERATIVE LAYER ---------------------------------------#
         if launch_DL:
-            pass #TODO
+            tab_title, command = prepare_deliberative_layer(param_files,
+                                                            param_dir,
+                                                            TOP_DIR)
+            groups.append((tab_title, command))
             
+        #==============================================================#
+        
         # Launch all the prepared components
         for group in groups:
             terminal = ["gnome-terminal"]
@@ -216,4 +284,4 @@ if __name__ == "__main__":
             print("Keyboard interrupt command recieved, stopping script.")
         except NameError:
             print("Name Error")
-        sleep(3)
+        sleep(2)

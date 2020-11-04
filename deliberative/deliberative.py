@@ -22,13 +22,14 @@ from moveit_msgs.msg import RobotTrajectory
 import rospy
 import tf
 
-import adapter as adpt
-import trajectories as traj
+import tactics.adapter as adpt
+import tactics.trajectories as traj
 
 # retrieve files nessecary for websocket comms and layer comms
 file_dir = sys.path[0]
 sys.path.append(file_dir + "/..")
 sys.path.append(file_dir + "/../..")
+from common import params
 from communication import rse_packing as rpack
 from rse_dam_msgs.msg import HLtoDL, DLtoHL, OptoDL, DLtoOp
 from rss_git_lite.common import rosConnectWrapper as rC
@@ -41,7 +42,31 @@ class DeliberativeModule(object):
     """
     
     def __init__(self):
-
+        
+        # Get command line arguments
+        param_files = sys.argv[1]
+        param_dir = sys.argv[2]
+        
+        # Get kinematic parameters from retrieved files
+        param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
+        self.robot = param_dict["robot"]
+        self.ref_frame = "origin_point" #TODO: tie to input arguments?
+        self.left_eef_frame = "left_" + param_dict["eef_link"]
+        self.right_eef_frame = "right_" + param_dict["eef_link"]
+        self.joint_max_velocity = [0.785, 1.571, 1.571, 1.571, 1.571] #<- FIXME: For now placed here, later more customizable
+        
+        # Get ip connection for other computer
+        connections = param_dict["connections"]
+        self.local_ip = connections["main"]
+        self.left_ip = connections["left_arm"]
+        self.right_ip = connections["right_arm"]
+        
+        # Print parameters to screen
+        rospy.loginfo("reference frame: {}".format(self.ref_frame))
+        rospy.loginfo("left end effector: {}".format(self.left_eef_frame))
+        rospy.loginfo("right end effector: {}".format(self.right_eef_frame))
+        rospy.loginfo("local IP address: {}".format(self.local_ip))
+        
         # Initialize rospy node
         rospy.init_node("deliberative_module")
         
@@ -50,17 +75,6 @@ class DeliberativeModule(object):
         
         # Get a lock
         self.lock = thread.allocate_lock()
-        
-        # Get relevent parameters
-        self.ref_frame = sys.argv[1]
-        self.left_eef_frame = sys.argv[2]
-        self.right_eef_frame = sys.argv[3]
-        self.connection = sys.argv[4]
-        self.joint_max_velocity = [0.785, 1.571, 1.571, 1.571, 1.571] #<- FIXME: For now placed here, later more customizable
-        rospy.loginfo("reference frame: {}".format(self.ref_frame))
-        rospy.loginfo("left end effector: {}".format(self.left_eef_frame))
-        rospy.loginfo("right end effector: {}".format(self.right_eef_frame))
-        rospy.loginfo("secondary computer IP address: {}".format(self.connection))
         
         # Module information setup
         self.state = "start"
@@ -113,14 +127,12 @@ class DeliberativeModule(object):
         """
         
         # Run through state machine and comms updates once each loop while rospy is running
+        r = rospy.Rate(20.0)
         while not rospy.is_shutdown():
-            print self.state
-            print self.substate
-            print ""
             self.run_state_machine()
             self.publish_DLtoOp()
-            rospy.sleep(0.01)
             #raw_input("Enter for next state...")
+            r.sleep()
     
     def cleanup(self):
         """
@@ -139,17 +151,14 @@ class DeliberativeModule(object):
         """
         
         # Setup publishers
-        # NOTE: For now, we assume that the left arm movegroup is on the
-        #       same computer as the DL. The right arm movegroup is assumed
-        #       to be on a separate computer, requiring websocket comms.
-        self.DL_to_left_HL_pub = rospy.Publisher("/deliberative/to_hl", DLtoHL, queue_size=1)
-        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', self.connection, "pub", "/deliberative/to_hl", "rse_dam_msgs/DLtoHL", rpack.pack_DL_to_HL)
-        self.DL_to_Op_pub = rospy.Publisher("/deliberative/to_op", DLtoOp, queue_size=1)
+        self.DL_to_left_HL_pub = rospy.Publisher("left_DLtoHL", DLtoHL, queue_size=1)
+        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', "ws://"+self.right_ip+":9090/", "pub", "/deliberative/to_hl", "rse_dam_msgs/DLtoHL", rpack.pack_DL_to_HL)
+        self.DL_to_Op_pub = rospy.Publisher("DLtoOP", DLtoOp, queue_size=1)
         
         # Setup subscribers
-        self.left_HL_to_DL_sub = rospy.Subscriber("/left_habitual/to_dl", HLtoDL, self.left_hl_cb)
-        self.right_HL_to_DL_sub = rospy.Subscriber("/right_habitual/to_dl", HLtoDL, self.right_hl_cb)
-        self.Op_to_DL_sub = rospy.Subscriber("/operator/to_dl", OptoDL, self.op_cb)
+        self.left_HL_to_DL_sub = rospy.Subscriber("left_HLtoDL", HLtoDL, self.left_hl_cb)
+        self.right_HL_to_DL_sub = rospy.Subscriber("right_HLtoDL", HLtoDL, self.right_hl_cb)
+        self.Op_to_DL_sub = rospy.Subscriber("OptoDL", OptoDL, self.op_cb)
     
     def left_hl_cb(self, msg):
         """
@@ -274,6 +283,8 @@ class DeliberativeModule(object):
                 self.state = "plan left arm"
             elif (plan_type=="right"):
                 self.state = "plan right arm"
+            elif (plan_type=="master-slave"):
+                self.state = "plan master-slave trajectory"
             else:
                 self.state = "fail up"
                 self.status = 4
@@ -350,6 +361,14 @@ class DeliberativeModule(object):
         elif (self.state=="plan right arm"):
             side = "right"
             plan_made = self.create_single_arm_trajectory(side)
+            if plan_made:
+                self.state = "execute_plan"
+            else:
+                self.state = "fail up"
+                
+        # Plan a master slave type motion
+        elif (self.state=="plan master-slave trajectory"):
+            plan_made = self.create_master_slave_plan()
             if plan_made:
                 self.state = "execute_plan"
             else:
@@ -434,6 +453,8 @@ class DeliberativeModule(object):
             plan_type = "left"
         elif (op_type==3):
             plan_type = "right"
+        elif (op_type==4):
+            plan_type = "master-slave"
         else:
             plan_type = "error"
             self.fail_info = "Planning type not recognized"
@@ -490,6 +511,16 @@ class DeliberativeModule(object):
         TODO: Create a plan for a single arm move
         """
         pass
+        
+    def create_master_slave_plan(self):
+        """
+        TODO: docstring
+        """
+        
+        task_poses = PoseArray()
+        task_poses.poses = [self.object_goal, self.right_grasp_pose]
+        left_msg = self.create_DLtoHL(True, 3, task_poses, "", Pose(), 1)
+        self.DL_to_left_HL_pub.publish(left_msg)
         
     def get_object_trajectory(self, template):
         """

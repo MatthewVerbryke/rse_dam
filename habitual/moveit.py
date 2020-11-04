@@ -358,7 +358,6 @@ class MoveItHabitualModule(object):
             # Let the DL know the HL is done
             # FIXME: a better way to do this?
             elif self.executed and (self.status==6):
-                self.increment += 1 
                 if self.rl_status!=2:
                     pass
                 else:
@@ -626,6 +625,7 @@ class MoveItHabitualModule(object):
         self.stamps = ""
         self.pose_traj = PoseArray()
         self.trajectory = RobotTrajectory()
+        rospy.loginfo("Trajectory successfully executed")
         
     def get_current_eef_pose(self):
         """
