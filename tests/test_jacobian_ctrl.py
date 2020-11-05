@@ -12,7 +12,7 @@ from csa_msgs.msg import TimedPoseArray
 file_dir = sys.path[0]
 sys.path.append(file_dir + "/..")
 sys.path.append(file_dir + "/../..")
-import deliberative.trajectories as traj
+import deliberative.tactics.trajectories as traj
 
 start_pose = Pose()
 start_pose.position.x = 0.209
@@ -35,7 +35,7 @@ goal_pose.orientation.w = 0.0
 rel_pose = Pose()
 rel_pose.position.x = 0.0
 rel_pose.position.y = 0.0
-rel_pose.position.z = 0.250
+rel_pose.position.z = 0.2
 rel_pose.orientation.x = 1.0
 rel_pose.orientation.y = 0.0
 rel_pose.orientation.z = 0.0
@@ -68,7 +68,7 @@ msg.ctrl_type = 2
 msg.poses = trjty
 
 def pubber():
-    pub = rospy.Publisher("boxbot/HLtoRL", HLtoRL, queue_size=1)
+    pub = rospy.Publisher("HLtoRL", HLtoRL, queue_size=1)
     rospy.init_node("pubber", anonymous=True)
     rate = rospy.Rate(10)
     i=1

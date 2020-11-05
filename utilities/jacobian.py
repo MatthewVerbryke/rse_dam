@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  Jacobian solution generator that  for a dual-arm robot.
+  Jacobian solution generator for a dual-arm robot.
 
   Copyright 2020 University of Cincinnati
   All rights reserved. See LICENSE file at:
@@ -12,7 +12,8 @@
   NOTE: Hoping that having a pre-generated solution in numpy might be 
         faster than manipulating sympy symbols directly.
 
-  TODO: Need to check accuracy of current code's answer
+  WARN: Probably will need to be reworked as some issues have cropped up
+        with in the code
   
 """
 
@@ -44,7 +45,7 @@ def get_jacobian_function(DH_param, base_transform):
     
     # Basic information
     num_joints = len(DH_param)
-    J_func = zeros(6,num_joints)
+    J_func = zeros(num_joints, 6)
     offsets = [None]*num_joints
     var_list = sp.symbols('q0:{}'.format(num_joints))
         
@@ -199,7 +200,7 @@ def main():
     DH_params = content["DH"]
     
     base_pose = []
-    base_pose_content = content["right_arm_base_pose"] #<-- TODO: make more general
+    base_pose_content = content["left_arm_base_pose"] #<-- TODO: make more general
     base_pose = Pose()
     base_pose.position.x = base_pose_content[0]
     base_pose.position.y = base_pose_content[1]

@@ -185,6 +185,7 @@ class PsuedoStateEstimationModule(object):
             if ip == self.local_ip:
                 pass
             else:
+                pass
                 new_ws_pub = rC.RosMsg("ws4py",
                                        "ws://"+ip+":9090/", 
                                        "pub",

@@ -47,8 +47,9 @@ class RelativeJacobianController(object):
         self.trajectory = TimedPoseArray()
         self.desired = Pose()
         
-        # Joint gain lists
-        self.p_gains = [15.0, 1.5, 1.5, 1.5, 1.5, 1.5]
+        # Gains
+        self.kp = [1.0, 1.0, 15.0, 1.0, 1.0, 1.0]
+        self.kp2 = [5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         
     def input_new_trajectory(self, trajectory):
         """
@@ -79,7 +80,9 @@ class RelativeJacobianController(object):
         self.desired_a = self.trajectory_a.poses[0]
         self.desired_r = self.trajectory_r.poses[0]
         self.end = self.start + self.trajectory_a.time_from_start[0]
-        print self.end.to_sec()
+        self.xa_dot = [0.0]*6
+        self.xr_dot = [0.0]*6
+        
         return True
         
     def remap_pose(self, pose, ref_pose):
@@ -209,6 +212,8 @@ class RelativeJacobianController(object):
                     cmd_a = None
                     cmd_b = None
                     status = 1
+                    #if self.i >=12:
+                        #status = 2
                 else:
                     cmd_a = None
                     cmd_b = None
@@ -234,41 +239,78 @@ class RelativeJacobianController(object):
         """
         
         # Extract relevant state information
-        joint_pos_a = state[0].position
+        joint_pos_a = list(state[0].position)
         Ja = state[1]
         eef_a = state[2]
-        joint_pos_b = state[3].position
+        joint_pos_b = list(state[3].position)
         Jb = state[4]
         eef_b = state[5]
         Jr = state[6]
-            
+        
+        # print "eef a"
+        # print eef_a
+        # print ""
+        # print "desired a"
+        # print self.desired_a
+        # print ""
+        
         # Determine desired change in master's pose (in 'task' space)
         Ta = self.pose_to_T_matrix(eef_a)
         Ta_des = self.pose_to_T_matrix(self.desired_a)
         xa_dot = self.get_delta_from_dT(Ta, Ta_des)
+        delta_a = np.array([[kp*a[0]/0.35] for kp,a in zip(self.kp,xa_dot)])
+        # print "delta a"
+        # print delta_a
+        # print ""
 
         # Determine desired change in slave's pose (in master's eef frame)
         eef_b_ra = self.remap_pose(eef_b, eef_a)
         Tr = self.pose_to_T_matrix(eef_b_ra)
         Tr_des = self.pose_to_T_matrix(self.desired_r)
         xr_dot = self.get_delta_from_dT(Tr, Tr_des)
+        delta_r = np.array([[kp*r[0]/0.35] for kp,r in zip(self.kp2,xr_dot)])
+        # print "delta r"
+        # print xr_dot
+        # print ""
         
         # # Use relative and individual Jacobians to determine q_dot
         Jr_inv = np.linalg.pinv(Jr)
         Ns_proj = np.identity(2*self.num_joints) - np.matmul(Jr_inv, Jr)
         Ja_ext = np.hstack((Ja, np.zeros((6,self.num_joints))))
         Ja_ns = np.matmul(Ns_proj, np.linalg.pinv(Ja_ext))
-        q_dot_full = np.matmul(Jr_inv, xr_dot) + np.matmul(Ja_ns, xa_dot)
+        q_dot_full = np.matmul(Jr_inv, delta_r) + np.matmul(Ja_ns, delta_a)
 
         # Determine desired change in joint position for each arm
         q_dot_a = q_dot_full[0:self.num_joints].flatten().tolist()
         q_dot_b = q_dot_full[self.num_joints:].flatten().tolist()
-        dq_a = [g*qa*self.dt for g,qa in zip(self.p_gains,q_dot_a)] 
-        dq_b = [g*qb*self.dt for g,qb in zip(self.p_gains,q_dot_b)]
+        # print "q_dot_a"
+        # print q_dot_a
+        # print ""
+        # print "q_dot_b"
+        # print q_dot_b
+        # print ""
+        # print "arm a joint pose"
+        # print joint_pos_a
+        # print ""
+        # print "arm b joint pose"
+        # print joint_pos_b
+        # print "--------------------------------------------------------"
         
         # Add changes to the commands for each arm
         status = 1
-        command_a = [sum(x) for x in zip(joint_pos_a, dq_a)]
-        command_b = [sum(y) for y in zip(joint_pos_b, dq_b)]
+        command_a = [qa + dqa*self.dt for qa,dqa in zip(joint_pos_a, q_dot_a)]
+        command_b = [qb + dqb*self.dt for qb,dqb in zip(joint_pos_b, q_dot_b)]
+        #command_a[0] = 0.0
+        #command_b[0] = 0.0
+        
+        # print "command a"
+        # print command_a
+        # print ""
+        # print "command b"
+        # print command_b
+        # print ""
+        # Store current error as previous error
+        #self.xa_dot_prev = xa_dot
+        #self.xr_dot_prev = xr_dot
         
         return command_a, command_b, status

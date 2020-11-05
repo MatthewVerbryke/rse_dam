@@ -9,9 +9,6 @@
   https://github.com/MatthewVerbryke/rse_dam
   Additional copyright may be held by others, as reflected in the commit
   history.
-  
-  TODO: Test pretty much everything
-  TODO: Improve documentation
 """
 
 
@@ -44,8 +41,6 @@ class UnifiedReflexiveModule(object):
     """
     RSE reflexive layer for a dual arm robot for unified control of both
     arms from one reflexive layer.
-    
-    TODO: Test pretty much everything.
     """
     
     def __init__(self):
@@ -68,7 +63,7 @@ class UnifiedReflexiveModule(object):
         # Get main parameters from file
         self.global_frame = "world"
         param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
-        self.rate = 20.0#param_dict["rate"]
+        self.rate = param_dict["write_rate"]
         self.robot = param_dict["robot"]
         self.connections = param_dict["connections"]
         self.local_ip = self.connections["left_arm"]
@@ -90,7 +85,6 @@ class UnifiedReflexiveModule(object):
         
         # Control parameters
         self.poses = TimedPoseArray()
-        self.trajectory = JointTrajectory()
         self.new_command = False
         self.state = "start"
         self.status = 0
@@ -136,8 +130,8 @@ class UnifiedReflexiveModule(object):
         """
         
         # Message topic names
-        RLtoHL_name = "{}/RLtoHL".format(self.robot)
-        HLtoRL_name = "{}/HLtoRL".format(self.robot)
+        RLtoHL_name = "RLtoHL".format(self.robot)
+        HLtoRL_name = "HLtoRL".format(self.robot)
         state_name = "{}/state_estimate".format(self.robot)
         left_command_name = "{}/left_arm/joint_commands".format(self.robot)
         right_command_name = "{}/right_arm/joint_commands".format(self.robot)
@@ -308,15 +302,16 @@ class UnifiedReflexiveModule(object):
                 self.status = 2
                 self.state = "reset"
             
-            rltohl_msg = self.build_RLtoHL_msg()
-            self.RLtoHL_pub.publish(rltohl_msg)
-            
         # Reset module
         elif self.state == "reset":
             self.controller = None
             self.new_command = False
-            self.status = 0
+            self.status = 2
             self.state = "standby"
+        
+        # Publish a return message to the reflexive layer at all times
+        rltohl_msg = self.build_RLtoHL_msg()
+        self.RLtoHL_pub.publish(rltohl_msg)
         
     #==== MODULE BEHAVIORS ============================================#
             
