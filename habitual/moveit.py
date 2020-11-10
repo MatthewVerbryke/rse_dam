@@ -100,7 +100,7 @@ class MoveItHabitualModule(object):
         self.gripper = moveit_commander.MoveGroupCommander("{}".format(self.gripper_group))
         
         # Get/set robot parameters
-        self.eef_link = "left_" + param_dict["eef_link"]
+        self.eef_link = self.side + "_" + param_dict["eef_link"]
         self.target_ref_frame = self.ref_frame
         self.arm.set_pose_reference_frame(self.ref_frame)
         self.correction_needed = False
@@ -310,7 +310,7 @@ class MoveItHabitualModule(object):
         
         # Check the reachability of the pose(s) given by the DL
         elif (self.state=="check reachability"):
-            goal_reachable = self.check_goal_reachability()
+            goal_reachable = True #self.check_goal_reachability()
             if goal_reachable:
                 self.state = self.determine_action()
             else:
@@ -595,6 +595,7 @@ class MoveItHabitualModule(object):
         TODO: Rework?
         """
         
+        self.trajectory.joint_trajectory.header.stamp = rospy.Time.now() + rospy.Duration(3.0)
         msg = self.build_HLtoRL_msg(True, 1,  self.trajectory)
         
         # Execute the generated plan

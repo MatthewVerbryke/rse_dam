@@ -123,7 +123,7 @@ def prepare_habitual_layer(side, param_files, param_dir, TOP_DIR, robot):
     
         tabtitle.extend(["movegroup_node"])
         command.extend([''' source %(TOP_DIR)s/devel/setup.bash
-                            roslaunch %(robot)s_bringup boxbot_moveit.launch
+                            roslaunch %(robot)s_bringup boxbot_moveit.launch side:=%(side)s
         ''' % locals()])
         
         tabtitle.extend(["{}_habitual_module".format(side)])

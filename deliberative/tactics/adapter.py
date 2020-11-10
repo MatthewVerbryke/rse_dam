@@ -25,7 +25,7 @@ def compute_eef_offset(frame_1, frame_2):
     Adapted from:
     https://answers.ros.org/question/229329/what-is-the-right-way-to-inverse-a-transform-in-python/
     """
-        
+    
     frames = [frame_1, frame_2]
     tf_frames = []
         
@@ -34,6 +34,8 @@ def compute_eef_offset(frame_1, frame_2):
         
         # If in a list found using LookupTransfrorm, use tf.transfrom
         if (type(frame)==list):
+            trans = frame[0]
+            rot = frame[1]
             trans_matrix = tf.transformations.translation_matrix(trans)
             rot_matrix = tf.transformations.quaternion_matrix(rot)
             tf_frames.append(tf.transformations.concatenate_matrices(trans_matrix, rot_matrix))
@@ -51,7 +53,7 @@ def compute_eef_offset(frame_1, frame_2):
         
     # Get the static transformation matrix from lead to follow frame
     offset = np.dot(matrix_1_inverse, tf_frames[1])
-
+    
     return offset
         
 def adapt_arm_poses(object_poses, offset):

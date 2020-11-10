@@ -50,7 +50,7 @@ class DeliberativeModule(object):
         # Get kinematic parameters from retrieved files
         param_dict = params.retrieve_params_yaml_files(param_files, param_dir)
         self.robot = param_dict["robot"]
-        self.ref_frame = "origin_point" #TODO: tie to input arguments?
+        self.ref_frame = "torso" #TODO: tie to input arguments?
         self.left_eef_frame = "left_" + param_dict["eef_link"]
         self.right_eef_frame = "right_" + param_dict["eef_link"]
         self.joint_max_velocity = [0.785, 1.571, 1.571, 1.571, 1.571] #<- FIXME: For now placed here, later more customizable
@@ -131,7 +131,6 @@ class DeliberativeModule(object):
         while not rospy.is_shutdown():
             self.run_state_machine()
             self.publish_DLtoOp()
-            #raw_input("Enter for next state...")
             r.sleep()
     
     def cleanup(self):
@@ -152,7 +151,7 @@ class DeliberativeModule(object):
         
         # Setup publishers
         self.DL_to_left_HL_pub = rospy.Publisher("left_DLtoHL", DLtoHL, queue_size=1)
-        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', "ws://"+self.right_ip+":9090/", "pub", "/deliberative/to_hl", "rse_dam_msgs/DLtoHL", rpack.pack_DL_to_HL)
+        self.DL_to_right_HL_pub = rC.RosMsg('ws4py', "ws://"+self.right_ip+":9090/", "pub", "right_DLtoHL", "rse_dam_msgs/DLtoHL", rpack.pack_DL_to_HL)
         self.DL_to_Op_pub = rospy.Publisher("DLtoOP", DLtoOp, queue_size=1)
         
         # Setup subscribers
@@ -302,8 +301,10 @@ class DeliberativeModule(object):
             
             # Substate for getting end-effector offsets
             elif (self.substate=="get offsets"):
-                self.left_offset = adpt.compute_eef_offset(self.object_position, self.left_return.eef_pose)
-                self.right_offset = adpt.compute_eef_offset(self.object_position, self.right_return.eef_pose)
+                left_eef_pose = self.lookup_frame_transform(self.ref_frame, self.left_eef_frame)
+                right_eef_pose = self.lookup_frame_transform(self.ref_frame, self.right_eef_frame)
+                self.left_offset = adpt.compute_eef_offset(self.object_position, left_eef_pose)
+                self.right_offset = adpt.compute_eef_offset(self.object_position, right_eef_pose)
                 if (self.left_offset!=[]) and (self.right_offset!=[]):
                     self.substate = "plan eef trajectories"
                 else:
@@ -548,19 +549,20 @@ class DeliberativeModule(object):
         
         return trajectory, timesteps 
         
-    def lookup_frame_transform(self, origin_frame, target_frame):       
+    def lookup_frame_transform(self, origin, target):       
         """
-        Get the transform of between two frames using tf.LookupTransform
+        Get the transform (translation and quaternion rotation) between 
+        two frames using tf.
         """   
         
         # Try to get the info on the frames from tf if given a link name
         try:
-            trans, rot = self.listener.lookupTransform(target_frame, origin_frame, rospy.Time(0))
+            self.listener.waitForTransform(origin, target, rospy.Time(), rospy.Duration(1.0))
+            trans, rot = self.listener.lookupTransform(origin, target, rospy.Time())
             return [trans, rot]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logerr("Failed to recieve the transform for {} to {}".format(origin_frame, target_frame))
-            self.fail_info("Failed to recieve the transform for {} to {}".format(origin_frame, target_frame))
-            return "error" #change
+            rospy.logerr("Failed to recieve the transform for {} to {}".format(origin, target))
+            return [None, None]
             
     def check_trajectory(self, side):
         """
